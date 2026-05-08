@@ -1,5 +1,6 @@
 import re
 from PIL import Image
+from paddleocr import PaddleOCR
 
 # =========================================================
 # OCR ENGINE INITIALIZATION (DEFERRED)
@@ -9,25 +10,30 @@ ocr_type = None
 
 def initialize_ocr():
     global ocr_engine, ocr_type
-    
+
     if ocr_engine is not None:
         return ocr_type
-    
+
     try:
         from paddleocr import PaddleOCR
+
         ocr_engine = PaddleOCR(
-    use_angle_cls=True,
-    lang='en',
-    show_log=False
-)
+            use_angle_cls=True,
+            lang='en'
+        )
+
         ocr_type = "paddle"
         return "paddle"
+
     except Exception as e:
         try:
             import pytesseract
+
             pytesseract.get_tesseract_version()
+
             ocr_type = "tesseract"
             return "tesseract"
+
         except Exception as e2:
             raise RuntimeError(
                 f"Failed to initialize OCR engines.\n"
@@ -35,7 +41,6 @@ def initialize_ocr():
                 f"Tesseract error: {str(e2)[:200]}\n"
                 f"Please install either paddleocr or pytesseract with Tesseract OCR."
             )
-
 
 
 # =========================================================
