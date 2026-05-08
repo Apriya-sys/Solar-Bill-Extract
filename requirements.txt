@@ -1,0 +1,9 @@
+streamlit
+paddleocr
+paddlepaddle==2.6.1
+opencv-python-headless
+pandas
+openpyxl
+Pillow
+numpy
+pdf2image

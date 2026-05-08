@@ -1,0 +1,34 @@
+
+====================================
+            BILL 1 DATA
+====================================
+consumer_number: 439322232375
+consumer_name: RANJANA MADHUSHAM KHOBRAGADE
+address: 214/1SHIVAJINAGAR 441912
+meter_number: 08203561050
+load_kw: 1.00
+tariff: 90/LTI Res 1-Phase
+bill_date: 10-01-2026
+due_date: 30-01-2026
+current_reading: 18429
+previous_reading: 18292
+units: 137
+bill_amount: 3440.00
+late_amount: 3450.00
+
+====================================
+            BILL 2 DATA
+====================================
+consumer_number: 439320095567
+consumer_name: 
+address: SHIWAJINAGAR H.NO.214TUMSAR TUMSAR441912
+meter_number: 08201154836
+load_kw: 3.30
+tariff: 90/LTRes 1-Phase
+bill_date: 10-01-2026
+due_date: 30-01-2026
+current_reading: 33699
+previous_reading: 33674
+units: 25
+bill_amount: 1460.00
+late_amount: 1470.00
