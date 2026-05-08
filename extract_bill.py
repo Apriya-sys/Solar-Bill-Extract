@@ -15,7 +15,11 @@ def initialize_ocr():
     
     try:
         from paddleocr import PaddleOCR
-        ocr_engine = PaddleOCR(use_angle_cls=True, lang='en')
+        ocr_engine = PaddleOCR(
+    use_angle_cls=True,
+    lang='en',
+    show_log=False
+)
         ocr_type = "paddle"
         return "paddle"
     except Exception as e:

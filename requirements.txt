@@ -1,9 +1,10 @@
-streamlit
-paddleocr
-paddlepaddle==2.6.2
-opencv-python-headless
+streamlit==1.45.1
+paddleocr==2.7.3
+paddlepaddle==2.6.1
+opencv-python-headless==4.10.0.84
 pandas
 openpyxl
 Pillow
-numpy<2
+numpy
 pdf2image
+pytesseract
