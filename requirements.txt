@@ -5,5 +5,5 @@ opencv-python-headless
 pandas
 openpyxl
 Pillow
-numpy
+numpy<2
 pdf2image
