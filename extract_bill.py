@@ -3,6 +3,8 @@ import cv2
 # from matplotlib import image
 # from matplotlib.pyplot import gray
 # from paddle.static import data
+from matplotlib import lines
+from matplotlib.pyplot import gray
 import pytesseract
 from PIL import Image
 from paddleocr import PaddleOCR
@@ -617,7 +619,7 @@ def extract_monthly_history(image_path):
     image = cv2.imread(image_path)
 
     # Crop monthly usage graph area
-    history_crop = image[430:900, 430:720]
+    history_crop = image[350:950, 250:650]
 
     # -------------------------------------------------
     # IMAGE PREPROCESSING
@@ -632,15 +634,17 @@ def extract_monthly_history(image_path):
         cv2.THRESH_BINARY
     )[1]
     cv2.imwrite("debug_history_crop.jpg", gray)
+    print("\nDEBUG IMAGE SAVED")
 
     # -------------------------------------------------
     # OCR
     # -------------------------------------------------
 
     history_text = pytesseract.image_to_string(
-    gray,
-    lang="eng"
-)
+        gray,
+        lang="eng+mar"
+    )
+
 
     print("\n========== MONTHLY HISTORY OCR ==========\n")
     print(history_text)
@@ -663,6 +667,8 @@ def extract_monthly_history(image_path):
     }
 
     lines = history_text.splitlines()
+    print("\nLINES FOUND:")
+    print(lines)
 
     for line in lines:
 
@@ -671,20 +677,31 @@ def extract_monthly_history(image_path):
         if not line:
             continue
 
-        match = re.search(r'(.+?)[-\s](\d{4}).*?(\d{1,3})$', line)
+        print("LINE:", line)
 
-        if match:
+        # Find year
+        year_match = re.search(r'20\d{2}', line)
 
-            month_raw = match.group(1).strip()
-            year = match.group(2)
-            units = match.group(3)
+        # Find units at end
+        units_match = re.search(r'(\d{1,3})\s*$', line)
 
-            month_english = month_map.get(month_raw, month_raw)
+        if not year_match or not units_match:
+            continue
 
-            monthly_history.append({
-                "month": f"{month_english} {year}",
-                "units": int(units)
-            })
+        year = year_match.group()
+
+        units = units_match.group(1)
+
+        month_raw = line.split(year)[0]
+
+        month_raw = month_raw.replace("-", "").strip()
+
+        month_english = month_map.get(month_raw, month_raw)
+
+        monthly_history.append({
+            "month": f"{month_english} {year}",
+            "units": int(units)
+        })
 
     print("\n========== MONTHLY HISTORY ==========\n")
     print(monthly_history)
