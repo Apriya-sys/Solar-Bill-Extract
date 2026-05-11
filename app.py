@@ -54,18 +54,33 @@ if uploaded_files:
         with col2:
             for key in right_fields:
                 st.markdown(f"**{key}:** `{data.get(key, '')}`")
+        # -------------------------------------------------
+# MONTHLY HISTORY DISPLAY 
+# -------------------------------------------------
 
-        st.divider()
+        monthly_history = data.get("monthly_history", [])
 
-    if all_data:
-        output_file = fill_excel_multi(all_data)
+        if monthly_history:
 
-        st.success(f"✅ Excel generated with {len(all_data)} bill(s)")
+            st.markdown("### Monthly Usage History")
 
-        with open(output_file, "rb") as f:
-            st.download_button(
-                label="📥 Download Excel File",
-                data=f,
-                file_name=os.path.basename(output_file),
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
+            for item in monthly_history:
+
+                st.write(
+                    f"{item['month']} : {item['units']} Units"
+                )
+
+                st.divider()
+
+            if all_data:
+                output_file = fill_excel_multi(all_data)
+
+                st.success(f"✅ Excel generated with {len(all_data)} bill(s)")
+
+                with open(output_file, "rb") as f:
+                    st.download_button(
+                        label="📥 Download Excel File",
+                        data=f,
+                        file_name=os.path.basename(output_file),
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
