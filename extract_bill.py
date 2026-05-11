@@ -25,10 +25,12 @@ def initialize_ocr():
         from paddleocr import PaddleOCR
 
         ocr_engine = PaddleOCR(
-            use_angle_cls=True,
+            use_angle_cls=False,
             lang='en',
-            enable_mkldnn=False,
-            use_gpu=False
+            # enable_mkldnn=False,
+            use_gpu=False,
+            show_log=False,
+            det_limit_side_len=960
         )
 
         ocr_type = "paddle"
@@ -645,7 +647,7 @@ def extract_monthly_history(image_path):
     # CROP MONTHLY HISTORY AREA
     # -------------------------------------------------
 
-    history_crop = image[350:950, 350:780]
+    history_crop = image[420:980, 430:760]
 
     # -------------------------------------------------
     # IMAGE PREPROCESSING
