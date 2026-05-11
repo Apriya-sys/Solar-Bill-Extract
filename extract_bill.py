@@ -287,40 +287,103 @@ def extract_load_kw(ocr_lines, full_text):
 
 
 def extract_tariff(ocr_lines):
-    """
-    Tariff appears near 'दर संकेत', 'tariff', 'LT', 'HT'.
-    MSEDCL format: 90/LT I Res 1-Phase
-    """
-    keywords = ["दर संकेत", "tariff", "rate code", "दर"]
 
-    for i, line in enumerate(ocr_lines):
-        lower = line.lower()
-        if any(kw.lower() in lower for kw in keywords):
-            # check next 2 lines for LT/HT tariff
-            window = ocr_lines[i:i+3]
-            for w in window:
-                if re.search(r'\bLT\b|\bHT\b', w, re.IGNORECASE):
-                    return format_tariff(w.strip())
-            # if the keyword line itself has the value
-            match = re.search(r'(\d+/LT[^\n]+)', line, re.IGNORECASE)
-            if match:
-                return format_tariff(match.group(1).strip())
-
-    # Fallback: find line with "LT" and "Phase"
-    for line in ocr_lines:
-        if re.search(r'\bLT\b', line, re.IGNORECASE) and re.search(
-            r'phase|1-phase|3-phase', line, re.IGNORECASE
-        ):
-            return format_tariff(line.strip())
+    # -------------------------------------------------
+    # FORMATTER
+    # -------------------------------------------------
 
     def format_tariff(t):
-        if not t: return ""
-        t = re.sub(r'(?i)(LT|HT)\s*Res', r'\1 Res', t)
-        t = re.sub(r'(?i)(LT|HT)Res', r'\1 Res', t)
+
+        if not t:
+            return ""
+
+        t = re.sub(
+            r'(?i)(LT|HT)\s*Res',
+            r'\1 Res',
+            t
+        )
+
+        t = re.sub(
+            r'(?i)(LT|HT)Res',
+            r'\1 Res',
+            t
+        )
+
         return t
 
+    # -------------------------------------------------
+    # SEARCH KEYWORDS
+    # -------------------------------------------------
+
+    keywords = [
+        "दर संकेत",
+        "tariff",
+        "rate code",
+        "दर"
+    ]
+
+    # -------------------------------------------------
+    # PRIMARY SEARCH
+    # -------------------------------------------------
+
+    for i, line in enumerate(ocr_lines):
+
+        lower = line.lower()
+
+        if any(kw.lower() in lower for kw in keywords):
+
+            window = ocr_lines[i:i+3]
+
+            for w in window:
+
+                if re.search(
+                    r'\bLT\b|\bHT\b',
+                    w,
+                    re.IGNORECASE
+                ):
+                    return format_tariff(w.strip())
+
+            match = re.search(
+                r'(\d+/LT[^\n]+)',
+                line,
+                re.IGNORECASE
+            )
+
+            if match:
+                return format_tariff(
+                    match.group(1).strip()
+                )
+
+    # -------------------------------------------------
+    # FALLBACK SEARCH
+    # -------------------------------------------------
+
     for line in ocr_lines:
-        if re.search(r'\d+/LT', line, re.IGNORECASE):
+
+        if re.search(
+            r'\bLT\b',
+            line,
+            re.IGNORECASE
+        ) and re.search(
+            r'phase|1-phase|3-phase',
+            line,
+            re.IGNORECASE
+        ):
+
+            return format_tariff(line.strip())
+
+    # -------------------------------------------------
+    # LAST FALLBACK
+    # -------------------------------------------------
+
+    for line in ocr_lines:
+
+        if re.search(
+            r'\d+/LT',
+            line,
+            re.IGNORECASE
+        ):
+
             return format_tariff(line.strip())
 
     return ""
