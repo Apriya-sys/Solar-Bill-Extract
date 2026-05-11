@@ -1,4 +1,7 @@
 import re
+import cv2
+from paddle.static import data
+import pytesseract
 from PIL import Image
 from paddleocr import PaddleOCR
 
@@ -544,6 +547,64 @@ def extract_amounts(ocr_lines, full_text):
                 late_amount = seen[1]
 
     return bill_amount, late_amount
+def extract_monthly_history(image_path):
+
+    image = cv2.imread(image_path)
+
+    # Crop monthly usage graph area
+    history_crop = image[500:1150, 350:780]
+
+    # OCR on cropped image
+    history_text = pytesseract.image_to_string(history_crop)
+
+    print("\n========== MONTHLY HISTORY OCR ==========\n")
+    print(history_text)
+
+    monthly_history = []
+
+    month_map = {
+        "जानेवारी": "January",
+        "फेब्रुवारी": "February",
+        "मार्च": "March",
+        "एप्रिल": "April",
+        "मे": "May",
+        "जून": "June",
+        "जुलै": "July",
+        "ऑगस्ट": "August",
+        "सप्टेंबर": "September",
+        "ऑक्टोबर": "October",
+        "नोव्हेंबर": "November",
+        "डिसेंबर": "December",
+    }
+
+    lines = history_text.splitlines()
+
+    for line in lines:
+
+        line = line.strip()
+
+        if not line:
+            continue
+
+        match = re.search(r'([^\d]+)-?(\d{4}).*?(\d+)$', line)
+
+        if match:
+
+            month_raw = match.group(1).strip()
+            year = match.group(2)
+            units = match.group(3)
+
+            month_english = month_map.get(month_raw, month_raw)
+
+            monthly_history.append({
+                "month": f"{month_english} {year}",
+                "units": int(units)
+            })
+
+    print("\n========== MONTHLY HISTORY ==========\n")
+    print(monthly_history)
+
+    return monthly_history
 
 
 # =========================================================
@@ -584,6 +645,9 @@ def extract_bill_data(image_path):
     bill_amt, late_amt = extract_amounts(ocr_lines, full_text)
     data["bill_amount"] = bill_amt
     data["late_amount"] = late_amt
+    monthly_history = extract_monthly_history(image_path)
+
+    data["monthly_history"] = monthly_history
 
     # ── PRINT RESULT ──────────────────────────────────────
     print("\n========== EXTRACTED DATA ==========\n")

@@ -81,47 +81,52 @@ def fill_excel_multi(all_data):
         cell.border = border
 
     # -------------------------------------------------
-    # MONTHLY DATA
+    # MONTHLY HISTORY DATA
     # -------------------------------------------------
+
+    monthly_history = first.get("monthly_history", [])
 
     total_units = 0
 
-    for index, bill in enumerate(all_data, start=1):
+    for index, item in enumerate(monthly_history):
 
-        row = start_row + index
+        row = start_row + index + 1
 
-        bill_date = bill.get("bill_date", "")
-
-        try:
-            dt = datetime.strptime(bill_date, "%d-%m-%Y")
-            month_name = dt.strftime("%B %Y")
-        except:
-            month_name = bill_date
-
-        units = float(bill.get("units", 0) or 0)
-
-        ws[f"A{row}"] = index
-        ws[f"B{row}"] = month_name
-        ws[f"C{row}"] = units
+        ws[f"A{row}"] = index + 2
+        ws[f"B{row}"] = item.get("month", "")
+        ws[f"C{row}"] = item.get("units", 0)
 
         ws[f"A{row}"].border = border
         ws[f"B{row}"].border = border
         ws[f"C{row}"].border = border
 
-        total_units += units
+        total_units += item.get("units", 0)
 
     # -------------------------------------------------
     # CALCULATIONS
     # -------------------------------------------------
 
-    calc_row = start_row + len(all_data) + 3
+    calc_row = start_row + len(monthly_history) + 3
 
-    avg_units = total_units / len(all_data)
+    if len(monthly_history) > 0:
+        avg_units = total_units / len(monthly_history)
+    else:
+        avg_units = 0
+
+    kw = avg_units / 106
+
+    solar_panels = kw / 0.6
+
+    solar_capacity = round(solar_panels * 0.7, 1)
+
+    num_panels = round(solar_capacity / 0.6)
 
     calculations = [
         ("Average Units", round(avg_units, 2)),
-        ("Required kW", round(avg_units / 106, 2)),
-        ("Solar Panels", round((avg_units / 106) / 0.6, 2)),
+        ("Required kW", round(kw, 2)),
+        ("Solar Panels", round(solar_panels, 2)),
+        ("Solar Capacity", solar_capacity),
+        ("Number of Panels", num_panels),
     ]
 
     for label, value in calculations:
@@ -154,5 +159,7 @@ def fill_excel_multi(all_data):
     output_file = f"outputs/all_bills_{timestamp}.xlsx"
 
     wb.save(output_file)
+
+    print(f"\n✅ Excel saved: {output_file}")
 
     return output_file
