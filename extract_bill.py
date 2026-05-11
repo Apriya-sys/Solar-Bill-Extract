@@ -66,23 +66,78 @@ def get_ocr_lines(image_path):
     ocr_type = initialize_ocr()
     ocr_lines = []
 
+    # -------------------------------
+    # TRY PADDLE OCR
+    # -------------------------------
     if ocr_type == "paddle":
-        result = ocr_engine.ocr(image_path)
-        for line in result[0]:
-            text = line[1][0].strip()
-            if text:
-                ocr_lines.append(text)
+
+        try:
+            result = ocr_engine.ocr(image_path)
+
+            if result and result[0]:
+
+                for line in result[0]:
+
+                    try:
+                        text = line[1][0].strip()
+
+                        if text:
+                            ocr_lines.append(text)
+
+                    except:
+                        continue
+
+            return ocr_lines
+
+        # -------------------------------
+        # FALLBACK TO TESSERACT
+        # -------------------------------
+        except Exception as e:
+
+            print("PaddleOCR failed:", str(e))
+
+            try:
+                img = Image.open(image_path)
+
+                text = pytesseract.image_to_string(img)
+
+                for line in text.splitlines():
+
+                    clean = line.strip()
+
+                    if clean:
+                        ocr_lines.append(clean)
+
+                return ocr_lines
+
+            except Exception as tesseract_error:
+
+                print("Tesseract also failed:", str(tesseract_error))
+
+                return []
+
+    # -------------------------------
+    # DIRECT TESSERACT MODE
+    # -------------------------------
     else:
-        import pytesseract
-        img = Image.open(image_path)
-        text = pytesseract.image_to_string(img)
-        for line in text.splitlines():
-            clean = line.strip()
-            if clean:
-                ocr_lines.append(clean)
 
-    return ocr_lines
+        try:
+            img = Image.open(image_path)
 
+            text = pytesseract.image_to_string(img)
+
+            for line in text.splitlines():
+
+                clean = line.strip()
+
+                if clean:
+                    ocr_lines.append(clean)
+
+        except Exception as e:
+
+            print("OCR failed:", str(e))
+
+        return ocr_lines
 
 def find_line_with(ocr_lines, *keywords, case_insensitive=True):
     """Return first line containing ANY of the given keywords."""
