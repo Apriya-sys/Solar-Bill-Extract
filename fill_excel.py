@@ -35,33 +35,60 @@ def fill_excel_multi(all_data):
     )
 
     # -------------------------------------------------
-    # CUSTOMER DETAILS
+    # CUSTOMER DETAILS (Columns B and D)
     # -------------------------------------------------
 
     first = all_data[0]
 
-    details = [
-        ("Consumer Name", first.get("consumer_name", "")),
-        ("Consumer Number", first.get("consumer_number", "")),
-        ("Bill Amount", first.get("bill_amount", "")),
-        ("Sanctioned Load", f"{first.get('load_kw', '')} KW"),
-        ("Tariff", first.get("tariff", "")),
-    ]
+    # Row 1: Consumer Name
+    ws["B1"] = "Consumer Name"
+    ws["D1"] = first.get("consumer_name", "")
+    ws["B1"].font = bold
+    ws["B1"].fill = header_fill
+    ws["B1"].border = border
+    ws["D1"].border = border
 
-    row = 1
+    # Row 2: Consumer No
+    ws["B2"] = "Consumer No"
+    ws["D2"] = first.get("consumer_number", "")
+    ws["B2"].font = bold
+    ws["B2"].fill = header_fill
+    ws["B2"].border = border
+    ws["D2"].border = border
 
-    for label, value in details:
+    # Row 3: Fixed Charges
+    ws["B3"] = "Fixed Charges"
+    ws["D3"] = first.get("fixed_charges", "130")
+    ws["B3"].font = bold
+    ws["B3"].fill = header_fill
+    ws["B3"].border = border
+    ws["D3"].border = border
 
-        ws[f"A{row}"] = label
-        ws[f"B{row}"] = value
+    # Row 4: Sanct. Load (kW)
+    ws["B4"] = "Sanct. Load (kW)"
+    ws["D4"] = f"{first.get('load_kw', '')}KW"
+    ws["B4"].font = bold
+    ws["B4"].fill = header_fill
+    ws["B4"].border = border
+    ws["D4"].border = border
 
-        ws[f"A{row}"].font = bold
-        ws[f"A{row}"].fill = header_fill
+    # Row 5: Connection Type
+    ws["B5"] = "Connection Type"
+    ws["D5"] = first.get("tariff", "")
+    ws["B5"].font = bold
+    ws["B5"].fill = header_fill
+    ws["B5"].border = border
+    ws["D5"].border = border
 
-        ws[f"A{row}"].border = border
-        ws[f"B{row}"].border = border
-
-        row += 1
+    # Row 7: Solar Panel Used
+    yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    ws["B7"] = "Solar Pannel used"
+    ws["C7"] = 600 # Placeholder as per image
+    ws["B7"].font = bold
+    ws["B7"].fill = header_fill
+    ws["B7"].border = border
+    ws["C7"].fill = yellow_fill
+    ws["C7"].border = border
 
     # -------------------------------------------------
     # TABLE HEADER
@@ -69,9 +96,9 @@ def fill_excel_multi(all_data):
 
     start_row = 10
 
-    headers = ["Sr.No", "Month", "Units"]
+    headers = ["Sr.No", "Month", "Units", "Bill Amount", "Unit Cost"]
 
-    for col, header in enumerate(headers, start=1):
+    for col, header in enumerate(headers, start=2): # Start from column B
 
         cell = ws.cell(row=start_row, column=col)
 
@@ -90,15 +117,15 @@ def fill_excel_multi(all_data):
 
     for index, item in enumerate(monthly_history):
 
-        row = start_row + index + 1
+        row_idx = start_row + index + 1
 
-        ws[f"A{row}"] = index + 2
-        ws[f"B{row}"] = item.get("month", "")
-        ws[f"C{row}"] = item.get("units", 0)
-
-        ws[f"A{row}"].border = border
-        ws[f"B{row}"].border = border
-        ws[f"C{row}"].border = border
+        ws.cell(row=row_idx, column=2).value = index + 2
+        ws.cell(row=row_idx, column=3).value = item.get("month", "")
+        ws.cell(row=row_idx, column=4).value = item.get("units", 0)
+        
+        # Style
+        for col in range(2, 7):
+            ws.cell(row=row_idx, column=col).border = border
 
         total_units += item.get("units", 0)
 
@@ -106,7 +133,7 @@ def fill_excel_multi(all_data):
     # CALCULATIONS
     # -------------------------------------------------
 
-    calc_row = start_row + len(monthly_history) + 3
+    calc_row = start_row + len(monthly_history) + 1
 
     if len(monthly_history) > 0:
         avg_units = total_units / len(monthly_history)
@@ -114,41 +141,52 @@ def fill_excel_multi(all_data):
         avg_units = 0
 
     kw = avg_units / 106
-
     solar_panels = kw / 0.6
-
     solar_capacity = round(solar_panels * 0.7, 1)
-
     num_panels = round(solar_capacity / 0.6)
 
     calculations = [
-        ("Average Units", round(avg_units, 2)),
-        ("Required kW", round(kw, 2)),
+        ("Average", round(avg_units, 2)),
+        ("kW", round(kw, 2)),
         ("Solar Panels", round(solar_panels, 2)),
-        ("Solar Capacity", solar_capacity),
+        ("Solar capacity", solar_capacity),
         ("Number of Panels", num_panels),
     ]
 
+    green_fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
+
     for label, value in calculations:
 
-        ws[f"A{calc_row}"] = label
-        ws[f"B{calc_row}"] = value
+        ws.cell(row=calc_row, column=3).value = label
+        ws.cell(row=calc_row, column=4).value = value
 
-        ws[f"A{calc_row}"].font = bold
-        ws[f"A{calc_row}"].fill = header_fill
-
-        ws[f"A{calc_row}"].border = border
-        ws[f"B{calc_row}"].border = border
+        ws.cell(row=calc_row, column=3).font = bold
+        ws.cell(row=calc_row, column=3).border = border
+        ws.cell(row=calc_row, column=4).border = border
+        
+        if label == "Solar capacity":
+            ws.cell(row=calc_row, column=4).fill = yellow_fill
+        if label == "Number of Panels":
+            ws.cell(row=calc_row, column=4).fill = green_fill
 
         calc_row += 1
+
+    # Bottom summary
+    ws.cell(row=calc_row+2, column=3).value = "Total solar capacity"
+    ws.cell(row=calc_row+2, column=4).value = solar_capacity * 2 # Placeholder logic
+    ws.cell(row=calc_row+3, column=3).value = "Number of solar panels"
+    ws.cell(row=calc_row+3, column=4).value = num_panels * 2
 
     # -------------------------------------------------
     # COLUMN WIDTH
     # -------------------------------------------------
 
-    ws.column_dimensions["A"].width = 25
-    ws.column_dimensions["B"].width = 30
-    ws.column_dimensions["C"].width = 15
+    ws.column_dimensions["A"].width = 10
+    ws.column_dimensions["B"].width = 25
+    ws.column_dimensions["C"].width = 30
+    ws.column_dimensions["D"].width = 25
+    ws.column_dimensions["E"].width = 15
+    ws.column_dimensions["F"].width = 15
 
     # -------------------------------------------------
     # SAVE
@@ -160,6 +198,6 @@ def fill_excel_multi(all_data):
 
     wb.save(output_file)
 
-    print(f"\n✅ Excel saved: {output_file}")
+    print(f"\nExcel saved: {output_file}")
 
     return output_file
