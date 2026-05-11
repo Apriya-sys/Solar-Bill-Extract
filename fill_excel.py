@@ -1,54 +1,38 @@
-import pandas as pd
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Border, Side
+from datetime import datetime
 import os
 
-from datetime import datetime
-from openpyxl import load_workbook
-
-
-COLUMNS = [
-    "consumer_number",
-    "consumer_name",
-    "address",
-    "meter_number",
-    "load_kw",
-    "tariff",
-    "bill_date",
-    "due_date",
-    "current_reading",
-    "previous_reading",
-    "units",
-    "bill_amount",
-    "late_amount",
-]
-
-
-def fill_excel(data):
-
-    os.makedirs("outputs", exist_ok=True)
-
-    df = pd.DataFrame([data], columns=COLUMNS)
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    output_file = f"outputs/{data.get('consumer_number', 'bill')}_{timestamp}.xlsx"
-
-    df.to_excel(output_file, index=False)
-
-    return output_file
-
-
-# =========================================================
-# NEW MULTI EXCEL FUNCTION
-# =========================================================
 
 def fill_excel_multi(all_data):
 
     os.makedirs("outputs", exist_ok=True)
 
-    template_path = "template.xlsx"
-
-    wb = load_workbook(template_path)
+    wb = Workbook()
     ws = wb.active
+
+    ws.title = "Solar Report"
+
+    # -------------------------------------------------
+    # STYLES
+    # -------------------------------------------------
+
+    bold = Font(bold=True)
+
+    header_fill = PatternFill(
+        start_color="FFA500",
+        end_color="FFA500",
+        fill_type="solid"
+    )
+
+    thin = Side(style='thin')
+
+    border = Border(
+        left=thin,
+        right=thin,
+        top=thin,
+        bottom=thin
+    )
 
     # -------------------------------------------------
     # CUSTOMER DETAILS
@@ -56,21 +40,53 @@ def fill_excel_multi(all_data):
 
     first = all_data[0]
 
-    ws["D1"] = first.get("consumer_name", "")
-    ws["D2"] = first.get("consumer_number", "")
-    ws["D3"] = first.get("bill_amount", "")
-    ws["D4"] = f"{first.get('load_kw', '')} KW"
-    ws["D5"] = first.get("tariff", "")
+    details = [
+        ("Consumer Name", first.get("consumer_name", "")),
+        ("Consumer Number", first.get("consumer_number", "")),
+        ("Bill Amount", first.get("bill_amount", "")),
+        ("Sanctioned Load", f"{first.get('load_kw', '')} KW"),
+        ("Tariff", first.get("tariff", "")),
+    ]
+
+    row = 1
+
+    for label, value in details:
+
+        ws[f"A{row}"] = label
+        ws[f"B{row}"] = value
+
+        ws[f"A{row}"].font = bold
+        ws[f"A{row}"].fill = header_fill
+
+        ws[f"A{row}"].border = border
+        ws[f"B{row}"].border = border
+
+        row += 1
+
+    # -------------------------------------------------
+    # TABLE HEADER
+    # -------------------------------------------------
+
+    start_row = 10
+
+    headers = ["Sr.No", "Month", "Units"]
+
+    for col, header in enumerate(headers, start=1):
+
+        cell = ws.cell(row=start_row, column=col)
+
+        cell.value = header
+        cell.font = bold
+        cell.fill = header_fill
+        cell.border = border
 
     # -------------------------------------------------
     # MONTHLY DATA
     # -------------------------------------------------
 
-    start_row = 10
-
     total_units = 0
 
-    for index, bill in enumerate(all_data):
+    for index, bill in enumerate(all_data, start=1):
 
         row = start_row + index
 
@@ -84,8 +100,13 @@ def fill_excel_multi(all_data):
 
         units = float(bill.get("units", 0) or 0)
 
-        ws[f"C{row}"] = month_name
-        ws[f"D{row}"] = units
+        ws[f"A{row}"] = index
+        ws[f"B{row}"] = month_name
+        ws[f"C{row}"] = units
+
+        ws[f"A{row}"].border = border
+        ws[f"B{row}"].border = border
+        ws[f"C{row}"].border = border
 
         total_units += units
 
@@ -93,21 +114,36 @@ def fill_excel_multi(all_data):
     # CALCULATIONS
     # -------------------------------------------------
 
+    calc_row = start_row + len(all_data) + 3
+
     avg_units = total_units / len(all_data)
 
-    ws["D25"] = round(avg_units, 2)
+    calculations = [
+        ("Average Units", round(avg_units, 2)),
+        ("Required kW", round(avg_units / 106, 2)),
+        ("Solar Panels", round((avg_units / 106) / 0.6, 2)),
+    ]
 
-    kw = avg_units / 106
-    ws["D26"] = round(kw, 2)
+    for label, value in calculations:
 
-    solar_panels = kw / 0.6
-    ws["D27"] = round(solar_panels, 2)
+        ws[f"A{calc_row}"] = label
+        ws[f"B{calc_row}"] = value
 
-    solar_capacity = round(solar_panels)
-    ws["D28"] = solar_capacity
+        ws[f"A{calc_row}"].font = bold
+        ws[f"A{calc_row}"].fill = header_fill
 
-    num_panels = solar_capacity * 2
-    ws["D29"] = num_panels
+        ws[f"A{calc_row}"].border = border
+        ws[f"B{calc_row}"].border = border
+
+        calc_row += 1
+
+    # -------------------------------------------------
+    # COLUMN WIDTH
+    # -------------------------------------------------
+
+    ws.column_dimensions["A"].width = 25
+    ws.column_dimensions["B"].width = 30
+    ws.column_dimensions["C"].width = 15
 
     # -------------------------------------------------
     # SAVE
@@ -118,7 +154,5 @@ def fill_excel_multi(all_data):
     output_file = f"outputs/all_bills_{timestamp}.xlsx"
 
     wb.save(output_file)
-
-    print(f"\n✅ Excel saved: {output_file}")
 
     return output_file
