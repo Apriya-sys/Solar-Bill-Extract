@@ -1,6 +1,6 @@
 streamlit
 paddleocr==2.7.3
-paddlepaddle-tiny==2.6.1
+paddlepaddle==2.6.2
 opencv-python-headless
 pandas
 openpyxl
