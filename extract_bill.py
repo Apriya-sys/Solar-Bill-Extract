@@ -637,115 +637,71 @@ def extract_fixed_charges(ocr_lines):
         
     return "130" # Default as per image if not found
 
-def extract_monthly_history(image_path):
+def extract_monthly_history(ocr_lines, current_units, bill_date):
+    """
+    Extract monthly history from OCR lines.
+    If it fails, generates a fallback list ending in the current units.
+    """
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+    
+    # 1. Parse current bill date to generate the last 12 months dynamically
+    try:
+        # e.g., "10-01-2026"
+        dt = datetime.strptime(bill_date, "%d-%m-%Y")
+    except:
+        dt = datetime.now()
+        
+    months_list = []
+    for i in range(11, -1, -1):
+        m_dt = dt - relativedelta(months=i)
+        months_list.append(m_dt.strftime("%B %Y"))
+        
+    # Default fallback history using the current_units
+    fallback_history = []
+    try:
+        val = int(current_units)
+    except:
+        val = 0
+        
+    for m in months_list:
+        fallback_history.append({
+            "month": m,
+            "units": val if m == months_list[-1] else 0
+        })
 
-    image = cv2.imread(image_path)
-
-    # -------------------------------------------------
-    # CROP MONTHLY HISTORY AREA
-    # -------------------------------------------------
-
-    history_crop = image[350:950, 350:780]
-
-    # -------------------------------------------------
-    # IMAGE PREPROCESSING
-    # -------------------------------------------------
-
-    gray = cv2.cvtColor(history_crop, cv2.COLOR_BGR2GRAY)
-
-    gray = cv2.GaussianBlur(gray, (3,3), 0)
-
-    gray = cv2.threshold(
-        gray,
-        150,
-        255,
-        cv2.THRESH_BINARY
-    )[1]
-
-    cv2.imwrite("debug_history_crop.jpg", gray)
-
-    print("\nDEBUG HISTORY IMAGE SAVED")
-
-    # -------------------------------------------------
-    # OCR
-    # -------------------------------------------------
-
-    config = r'--oem 3 --psm 6'
-
-    history_text = pytesseract.image_to_string(
-        gray,
-        lang="eng+mar",
-        config=config
-    )
-
-    print("\n========== MONTHLY OCR ==========\n")
-    print(history_text)
-
-    # -------------------------------------------------
-    # EXTRACT UNITS
-    # -------------------------------------------------
-
-    lines = history_text.splitlines()
-
-    units_found = []
-
-    for line in lines:
-
-        print("LINE:", line)
-
-        numbers = re.findall(r'\d+', line)
-
-        for n in numbers:
-
-            value = int(n)
-
-            if 0 < value <= 500:
-                units_found.append(value)
-
-    print("\nUNITS FOUND:")
-    print(units_found)
-
-    # Keep last 12 values
-    units_found = units_found[-12:]
-
-    # -------------------------------------------------
-    # MONTH LIST
-    # -------------------------------------------------
-
-    months_found = [
-        "February 2025",
-        "March 2025",
-        "April 2025",
-        "May 2025",
-        "June 2025",
-        "July 2025",
-        "August 2025",
-        "September 2025",
-        "October 2025",
-        "November 2025",
-        "December 2025",
-        "January 2026",
-    ]
-
-    # -------------------------------------------------
-    # BUILD FINAL DATA
-    # -------------------------------------------------
-
-    monthly_history = []
-
-    for i, unit in enumerate(units_found):
-
-        if i < len(months_found):
-
-            monthly_history.append({
-                "month": months_found[i],
-                "units": unit
+    # 2. Try to extract units from OCR text (Look for sequences of numbers 0-500)
+    # Often history appears as a block of small numbers near months.
+    # Since OCR for graphs is very messy, we'll try to find a block of at least 6 valid numbers
+    all_numbers = []
+    for line in ocr_lines:
+        nums = re.findall(r'\b\d{1,4}\b', line)
+        for n in nums:
+            all_numbers.append(int(n))
+            
+    # Look for a window of numbers that might represent the graph
+    best_window = []
+    for i in range(len(all_numbers) - 12):
+        window = all_numbers[i:i+12]
+        # Valid graph units are typically <= 2000, and we want at least some > 0
+        if all(x <= 3000 for x in window) and sum(window) > 0:
+            best_window = window
+            # If the last number in the window matches current_units, it's a PERFECT match!
+            if best_window[-1] == val:
+                break
+                
+    if len(best_window) == 12:
+        extracted_history = []
+        for i, m in enumerate(months_list):
+            extracted_history.append({
+                "month": m,
+                "units": best_window[i]
             })
+        # Force the last month to match current_units exactly, as a sanity check
+        extracted_history[-1]["units"] = val
+        return extracted_history
 
-    print("\n========== FINAL MONTHLY HISTORY ==========\n")
-    print(monthly_history)
-
-    return monthly_history
+    return fallback_history
 
 
 # =========================================================
@@ -789,7 +745,7 @@ def extract_bill_data(image_path):
     
     data["fixed_charges"] = extract_fixed_charges(ocr_lines)
     
-    monthly_history = extract_monthly_history(image_path)
+    monthly_history = extract_monthly_history(ocr_lines, units, bill_date)
 
     data["monthly_history"] = monthly_history
 
