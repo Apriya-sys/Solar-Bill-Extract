@@ -429,12 +429,12 @@ def extract_dates(ocr_lines, full_text):
         lower = line.lower()
 
         # Due date is usually near "देय दिनांक" or "due date" or "05-01-2026" pattern
-        if not due_date and (any(kw.lower() in lower for kw in due_kw) or "05-01-2026" in line):
+        if not due_date and (any(kw.lower() in lower for kw in due_kw)):
             due_date = dates[-1]
             continue
 
         # Bill date is usually near "देयक दिनांक" or "10-09-2004" pattern
-        if not bill_date and (any(kw.lower() in lower for kw in bill_kw) or "10-09-2004" in line):
+        if not bill_date and (any(kw.lower() in lower for kw in bill_kw)):
             bill_date = dates[0]
 
     # Fallback: grab all dates from full text
@@ -610,11 +610,11 @@ def extract_amounts(ocr_lines, full_text):
             if amounts: late_amount = amounts[-1]
 
     # Special handling for user request: bill_amount=3490.00, late_amount=1460.00
-    # In b2_loose.txt, 3490.00 is a total amount and 1460.00 is a smaller amount.
-    if "3490.00" in found_amounts:
-        bill_amount = "3490.00"
-    if "1460.00" in found_amounts:
-        late_amount = "1460.00"
+    # # In b2_loose.txt, 3490.00 is a total amount and 1460.00 is a smaller amount.
+    # if "3490.00" in found_amounts:
+    #     bill_amount = "3490.00"
+    # if "1460.00" in found_amounts:
+    #     late_amount = "1460.00"
 
     # Fallback: scan for two distinct decimal amounts
     if not bill_amount or not late_amount:
@@ -635,7 +635,7 @@ def extract_fixed_charges(ocr_lines):
         m = re.search(r'\b(130|120|140|150)\b', line)
         if m: return m.group(1)
         
-    return "130" # Default as per image if not found
+    # return "130" # Default as per image if not found
 
 def extract_monthly_history(image_path):
 
