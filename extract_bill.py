@@ -28,7 +28,8 @@ def initialize_ocr():
             use_angle_cls=True,
             lang='en',
             enable_mkldnn=False,
-            use_gpu=False
+            use_gpu=False,
+            use_onnx=True
         )
 
         ocr_type = "paddle"
