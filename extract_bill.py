@@ -25,7 +25,7 @@ def initialize_ocr():
         from paddleocr import PaddleOCR
 
         ocr_engine = PaddleOCR(
-            use_angle_cls=True,
+            use_angle_cls=False,
             lang='en',
             enable_mkldnn=False,
             use_gpu=False
@@ -65,15 +65,34 @@ def get_ocr_lines(image_path):
     ocr_lines = []
 
     if ocr_type == "paddle":
-        result = ocr_engine.ocr(image_path)
-        for line in result[0]:
-            text = line[1][0].strip()
-            if text:
-                ocr_lines.append(text)
-    else:
+        try:
+            global ocr_engine
+            # Lower image size for memory constrained environments (Streamlit Cloud)
+            # Default limit is 960, we can use 736 to save RAM
+            result = ocr_engine.ocr(image_path, det=True, rec=True, cls=False)
+            
+            for line in result[0]:
+                if line and len(line) > 1 and line[1]:
+                    text = line[1][0].strip()
+                    if text:
+                        ocr_lines.append(text)
+        except Exception as e:
+            print(f"PaddleOCR failed during execution: {e}. Falling back to Tesseract.")
+            ocr_type = "tesseract"
+
+    if ocr_type == "tesseract":
         import pytesseract
+        from PIL import Image
         img = Image.open(image_path)
-        text = pytesseract.image_to_string(img)
+        # Pre-process image for better tesseract results
+        import cv2
+        import numpy as np
+        cv_img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        # Binarization
+        _, cv_img = cv2.threshold(cv_img, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+        img = Image.fromarray(cv_img)
+        
+        text = pytesseract.image_to_string(img, config='--oem 3 --psm 6')
         for line in text.splitlines():
             clean = line.strip()
             if clean:
