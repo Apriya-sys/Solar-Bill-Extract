@@ -26,7 +26,9 @@ def initialize_ocr():
 
         ocr_engine = PaddleOCR(
             use_angle_cls=True,
-            lang='en' # Changed from en+mar to avoid initialization error
+            lang='en',
+            enable_mkldnn=False,
+            use_gpu=False
         )
 
         ocr_type = "paddle"
