@@ -1,6 +1,8 @@
 import re
 import cv2
-from paddle.static import data
+# from matplotlib import image
+# from matplotlib.pyplot import gray
+# from paddle.static import data
 import pytesseract
 from PIL import Image
 from paddleocr import PaddleOCR
@@ -22,7 +24,7 @@ def initialize_ocr():
 
         ocr_engine = PaddleOCR(
             use_angle_cls=True,
-            lang='en'
+            lang='en+mar'
         )
 
         ocr_type = "paddle"
@@ -552,10 +554,30 @@ def extract_monthly_history(image_path):
     image = cv2.imread(image_path)
 
     # Crop monthly usage graph area
-    history_crop = image[500:1150, 350:780]
+    history_crop = image[430:900, 430:720]
 
-    # OCR on cropped image
-    history_text = pytesseract.image_to_string(history_crop)
+    # -------------------------------------------------
+    # IMAGE PREPROCESSING
+    # -------------------------------------------------
+
+    gray = cv2.cvtColor(history_crop, cv2.COLOR_BGR2GRAY)
+
+    gray = cv2.threshold(
+        gray,
+        150,
+        255,
+        cv2.THRESH_BINARY
+    )[1]
+    cv2.imwrite("debug_history_crop.jpg", gray)
+
+    # -------------------------------------------------
+    # OCR
+    # -------------------------------------------------
+
+    history_text = pytesseract.image_to_string(
+    gray,
+    lang="eng"
+)
 
     print("\n========== MONTHLY HISTORY OCR ==========\n")
     print(history_text)
@@ -586,7 +608,7 @@ def extract_monthly_history(image_path):
         if not line:
             continue
 
-        match = re.search(r'([^\d]+)-?(\d{4}).*?(\d+)$', line)
+        match = re.search(r'(.+?)[-\s](\d{4}).*?(\d{1,3})$', line)
 
         if match:
 
