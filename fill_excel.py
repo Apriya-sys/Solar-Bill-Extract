@@ -2,6 +2,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border, Side
 from datetime import datetime
 import os
+import re
 
 
 def fill_excel_multi(all_data):
