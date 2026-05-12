@@ -1,7 +1,6 @@
 import os
-import cv2
-import numpy as np
 from ensemble_extractor import extract_with_ensemble
+
 from validations import clean_data, validate_units, validate_amounts, validate_consumer_number
 
 def extract_bill_data(image_path, mistral_api_key=None, groq_api_key=None):

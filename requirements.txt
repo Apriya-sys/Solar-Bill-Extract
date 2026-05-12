@@ -1,16 +1,7 @@
 streamlit
-paddleocr==2.7.3
-paddlepaddle==2.6.2
-opencv-python-headless
 pandas
 openpyxl
 Pillow
-numpy<2
-pdf2image
-pytesseract
-onnxruntime
 mistralai
 python-dotenv
 groq
-
-
