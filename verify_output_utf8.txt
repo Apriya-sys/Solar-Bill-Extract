@@ -1,101 +1,57 @@
 ﻿
 --- Testing bill1.jpeg ---
-[2026/05/12 20:30:22] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
-DEBUG CONSUMER LINES: ['G', '503176813983', '91xxxxxx09', '439322232375', 'RANJANA MADHUSHAM KHOBRAGADE', '214/1SHIVAJNAGAR441912', 'A', 'F', '24912']
-[2026/05/12 20:30:23] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
-[2026/05/12 20:30:25] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
-[2026/05/12 20:30:28] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
-[2026/05/12 20:30:29] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
-[2026/05/12 20:30:41] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
-
-========== EXTRACTED DATA ==========
-
-consumer_number: 439322232375
-consumer_name: 91xxxxxx09
-address: 439322232375
-RANJANA MADHUSHAM KHOBRAGADE
-214/1SHIVAJNAGAR441912
-A
-F
-24912
-meter_number: 08203561050
-load_kw: 1.00
-tariff: 
-bill_date: 10-01-2026
-due_date: 30-01-2026
-current_reading: 18429
-previous_reading: 18292
-units: 137
-bill_amount: 3450.00
-late_amount: 3450.00
+[2026/05/12 22:11:46] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
+[2026/05/12 22:11:48] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
+[2026/05/12 22:11:50] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
+[2026/05/12 22:11:53] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
+[2026/05/12 22:11:55] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
+[2026/05/12 22:12:04] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
+[2026/05/12 22:12:26] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
 
 Result Data:
-  consumer_number: 439322232375
-  consumer_name: 91xxxxxx09
-  address: 439322232375
-RANJANA MADHUSHAM KHOBRAGADE
-214/1SHIVAJNAGAR441912
-A
-F
-24912
+  consumer_name: [Encoding Error]
+  address: [Encoding Error]
   meter_number: 08203561050
   load_kw: 1.00
   tariff: 
-  current_reading: 18429
-  previous_reading: 18292
-  units: 137
-  bill_amount: 3450.00
+  current_reading: 3435
+  previous_reading: 2033
+  units: 1402
+  bill_amount: 3440.00
   late_amount: 3450.00
   bill_date: 10-01-2026
   due_date: 30-01-2026
-  monthly_history: 5 items
+  consumer_number: 439322232375
+  monthly_history: 0 items
   valid_units: True
   valid_amounts: True
   valid_consumer: True
   fixed_charges: 130
 
 --- Testing bill2.jpeg ---
-[2026/05/12 20:30:44] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
-DEBUG CONSUMER LINES: ['3176814600', '439320095567', '94xxxxxx39', 'SHIWAJINAGAR H.NO214TUMSAR TUMSAR441912', '214441912']
-[2026/05/12 20:30:45] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
-[2026/05/12 20:30:48] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
-[2026/05/12 20:30:51] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
-[2026/05/12 20:30:52] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
-[2026/05/12 20:31:02] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
-
-========== EXTRACTED DATA ==========
-
-consumer_number: 439320095567
-consumer_name: 94xxxxxx39
-address: SHIWAJINAGAR H.NO214TUMSAR TUMSAR441912
-214441912
-meter_number: 08201154836
-load_kw: 3.30
-tariff: 
-bill_date: 10-01-2026
-due_date: 30-01-2026
-current_reading: 20320
-previous_reading: 20258
-units: 62
-bill_amount: 1460.00
-late_amount: 1470.00
+[2026/05/12 22:12:30] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
+[2026/05/12 22:12:33] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
+[2026/05/12 22:12:36] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
+[2026/05/12 22:12:39] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
+[2026/05/12 22:12:40] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
+[2026/05/12 22:12:49] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
+[2026/05/12 22:13:12] ppocr WARNING: Since the angle classifier is not initialized, it will not be used during the forward process
 
 Result Data:
-  consumer_number: 439320095567
-  consumer_name: 94xxxxxx39
-  address: SHIWAJINAGAR H.NO214TUMSAR TUMSAR441912
-214441912
+  consumer_name: SHRIIMADHUSHAINIROOPOHAND
+  address: [Encoding Error]
   meter_number: 08201154836
   load_kw: 3.30
   tariff: 
-  current_reading: 20320
-  previous_reading: 20258
-  units: 62
+  current_reading: 2028
+  previous_reading: 2025
+  units: 3
   bill_amount: 1460.00
   late_amount: 1470.00
   bill_date: 10-01-2026
-  due_date: 30-01-2026
-  monthly_history: 9 items
+  due_date: 15-02-2026
+  consumer_number: 439320095567
+  monthly_history: 0 items
   valid_units: True
   valid_amounts: True
   valid_consumer: True

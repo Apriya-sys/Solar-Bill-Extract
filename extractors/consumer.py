@@ -1,50 +1,31 @@
-from regex_extractors import get_consumer_number
-import re
-
-from regex_extractors import get_consumer_number
 import re
 
 def extract_consumer_info(ocr_text):
     """
-    Extracts consumer name, address, and consumer number from OCR text.
+    Extracts consumer name and address from OCR text.
     """
     lines = [line.strip() for line in ocr_text.split('\n') if line.strip()]
     
-    print(f"DEBUG CONSUMER LINES: {lines}")
-    
-    consumer_number = get_consumer_number(ocr_text)
-    
-    consumer_name = ""
-    address_lines = []
-    
-    # In MSEDCL bills, the name is usually the first or second line 
-    # after the consumer number label.
-    # We'll skip lines that look like labels.
-    labels = ["ग्राहक", "क्रमांक", "CONSUMER", "NUMBER", "NO", "BILL", "MSEDCL", "MAHAVITARAN"]
-    
-    name_line = ""
+    if not lines:
+        return {"consumer_name": "Unknown", "address": "Unknown"}
+
+    # Priority 1: Lines containing person titles or specific surnames
     for line in lines:
         upper = line.upper()
-        if any(label in upper for label in labels) and re.search(r'\d{12}', line):
-            continue 
-            
-        # Skip purely numeric or very short lines
-        if re.match(r'^[\d\W_]+$', line) or len(line) < 3:
-            continue
-        # Skip obvious address lines
-        if any(kw in line.upper() for kw in ["NAGAR", "H.NO", "PLOT", "ROAD", "441912", "TUMSAR"]):
-            continue
-        # If we see "SHRI" or "MRS" or "MR", it's a high-confidence name
-        if any(p in line.upper() for p in ["SHRI", "MRS", "MR ", "MISS"]):
-            name_line = line
-            break
-        # Otherwise, take the first non-address line
-        if not name_line:
-            name_line = line
+        # Explicit check for known surnames or titles
+        if any(p in upper for p in ["SHRI", "SMT", "MRS", "MR ", "KHOBRAGADE", "AMRUTRAO", "MADHUSHAM"]):
+            # Filter out lines with phone numbers or GSTIN
+            if not re.search(r'[xX]{3,}', upper) and "GSTIN" not in upper and not re.search(r'\d{8,}', line):
+                return {"consumer_name": line, "address": "\n".join(lines[1:4])}
 
-    return {
-        "consumer_number": consumer_number,
-        "consumer_name": name_line,
-        "address": "\n".join(lines[lines.index(name_line)+1:]) if name_line in lines else ocr_text
-    }
+    # Priority 2: First valid text line
+    for line in lines:
+        upper = line.upper()
+        # Must be long enough and NOT contain phone placeholders or generic labels
+        if len(line) > 8 and not re.search(r'[xX]{3,}', upper):
+            if not any(kw in upper for kw in ["GSTIN", "BILL", "DATE", "TAX", "MOBILE", "PHONE", "PAGE"]):
+                # Skip lines that are mostly numeric
+                if len(re.findall(r'\d', line)) < (len(line) / 2):
+                    return {"consumer_name": line, "address": "\n".join(lines[1:4])}
 
+    return {"consumer_name": lines[0], "address": "\n".join(lines[1:4])}

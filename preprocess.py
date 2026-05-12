@@ -1,10 +1,10 @@
-# Overwriting with simpler, more reliable preprocessing
 import cv2
 import numpy as np
 
-def preprocess_for_ocr(image):
+def preprocess_for_ocr(image, upscale=True, apply_clahe=False):
     """
-    Applies minimal preprocessing to an image/crop to improve OCR accuracy.
+    Standard preprocessing for PaddleOCR.
+    Upscale helps with small fonts, CLAHE helps with faded/low-contrast text.
     """
     if image is None:
         return None
@@ -12,35 +12,24 @@ def preprocess_for_ocr(image):
     # Convert to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
-    # Increase contrast
-    alpha = 1.3 # Contrast control
-    beta = 0    # Brightness control
-    adjusted = cv2.convertScaleAbs(gray, alpha=alpha, beta=beta)
+    if apply_clahe:
+        # Adaptive histogram equalization for faded ink
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        gray = clahe.apply(gray)
+
+    if upscale:
+        # 2x Upscale for small text
+        gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
     
-    # Sharpening kernel (mild)
-    kernel = np.array([[0,-1,0], [-1,5,-1], [0,-1,0]])
-    sharpened = cv2.filter2D(adjusted, -1, kernel)
+    # Sharpness filter
+    kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+    gray = cv2.filter2D(gray, -1, kernel)
     
-    return sharpened
+    return gray
 
-
-
-
-def resize_image(image, width=None, height=None, inter=cv2.INTER_AREA):
-    """
-    Resizes an image while maintaining aspect ratio.
-    """
-    dim = None
-    (h, w) = image.shape[:2]
-
-    if width is None and height is None:
-        return image
-
-    if width is None:
-        r = height / float(h)
-        dim = (int(w * r), height)
-    else:
-        r = width / float(w)
-        dim = (width, int(h * r))
-
-    return cv2.resize(image, dim, interpolation=inter)
+def resize_image(image, width=1200):
+    """Resize image maintaining aspect ratio."""
+    h, w = image.shape[:2]
+    ratio = width / float(w)
+    new_h = int(h * ratio)
+    return cv2.resize(image, (width, new_h))

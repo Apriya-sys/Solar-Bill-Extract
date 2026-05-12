@@ -1,12 +1,15 @@
+import cv2
 # Bill region coordinates (y1:y2, x1:x2)
+
 # These may need adjustment based on the actual resolution of the bill images.
 
 # Adjusted for ~1280x882 resolution (Height x Width)
 BILL_REGIONS = {
     "consumer": {
-        "y": (60, 220), 
-        "x": (20, 650)
+        "y": (20, 250), 
+        "x": (0, 700)
     },
+
     "bill_details": { # Top right: Dates and Amount
         "y": (60, 250), 
         "x": (650, 880)
@@ -45,4 +48,11 @@ def get_crop(image, region_name):
     y2 = min(y2, h)
     x2 = min(x2, w)
     
-    return image[y1:y2, x1:x2]
+    crop = image[y1:y2, x1:x2]
+    
+    # Add white padding to help OCR
+    pad = 10
+    padded = cv2.copyMakeBorder(crop, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+    
+    return padded
+
