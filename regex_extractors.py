@@ -88,6 +88,26 @@ def get_amounts_with_labels(text):
     bill_amt = bill_matches[0] if bill_matches else ""
     late_amt = late_matches[0] if late_matches else ""
     
+    # Clean text: remove commas and normalize spaces
+    cleaned_text = re.sub(r',', '', text)
+    
+    # MSEDCL Amount Labels
+    amount_labels = {
+        "bill_amount": [r"Bill Amt", r"Total Amt", r"देय रक्कम", r"एकूण रक्कम", r"Current Bill"],
+        "late_amount": [r"Late Amt", r"After Due Date", r"विलंब", r"दिनांनंतर"]
+    }
+    
+    # Priority 1: Label-based search
+    for label, patterns in amount_labels.items():
+
+        for pattern in patterns:
+            if re.search(pattern, cleaned_text, re.IGNORECASE):
+                # Look for decimal numbers in the same line or next
+                match = re.search(pattern + r'.*?(\d{3,6}\.\d{2})', cleaned_text, re.IGNORECASE | re.DOTALL)
+                if match:
+                    if label == "bill_amount": bill_amt = match.group(1)
+                    else: late_amt = match.group(1)
+    
     # Priority 2: Look for common MSEDCL amount pairs (Late Amt is usually Bill Amt + 10 or 1.25% more)
     if not bill_amt or not late_amt:
         all_matches = re.findall(r'\b\d{3,6}\.\d{2}\b', cleaned_text)
@@ -105,19 +125,21 @@ def get_amounts_with_labels(text):
                     a2 = unique_amounts[j] # Potentially Bill Amt (smaller)
                     if a1 > a2:
                         diff = a1 - a2
-                        if abs(diff - 10) < 2 or (a2 * 0.01 <= diff <= a2 * 0.05):
+                        # MSEDCL Late Fee is usually 10 or 1.25%
+                        if abs(diff - 10) < 2 or (a2 * 0.01 <= diff <= a2 * 0.02):
                             bill_amt = f"{a2:.2f}"
                             late_amt = f"{a1:.2f}"
                             return bill_amt, late_amt
                             
-            # If no pair fits pattern, just pick the top two
+            # If no pair fits pattern, pick the two largest (Late and Current)
             late_amt = f"{unique_amounts[0]:.2f}"
             bill_amt = f"{unique_amounts[1]:.2f}"
             return bill_amt, late_amt
         elif len(unique_amounts) == 1:
             return f"{unique_amounts[0]:.2f}", f"{unique_amounts[0]:.2f}"
             
-    return "", ""
+    return bill_amt or "", late_amt or ""
+
 
 
 

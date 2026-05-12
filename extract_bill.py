@@ -19,32 +19,7 @@ from extractors.meter import extract_meter_info
 from extractors.readings import extract_reading_info
 from extractors.amounts import extract_amount_info
 from extractors.monthly_history import extract_history
-# Validation functions moved here to avoid import issues
-def validate_units(current, previous, units):
-    try:
-        cur = float(current)
-        prev = float(previous)
-        u = float(units)
-        return abs((cur - prev) - u) < 0.01
-    except: return False
-
-def validate_amounts(bill_amount, late_amount):
-    try:
-        ba = float(bill_amount)
-        la = float(late_amount)
-        return la >= ba
-    except: return False
-
-def validate_consumer_number(consumer_number):
-    if not consumer_number: return False
-    return str(consumer_number).startswith("43") and len(str(consumer_number)) == 12
-
-def clean_data(data):
-    for key in data:
-        if isinstance(data[key], str):
-            data[key] = data[key].strip()
-    return data
-
+from validations import clean_data, validate_units, validate_amounts, validate_consumer_number
 
 
 # =========================================================
@@ -64,13 +39,13 @@ def initialize_ocr():
         from paddleocr import PaddleOCR
 
         ocr_engine = PaddleOCR(
-            use_angle_cls=True,
+            use_angle_cls=False,
             lang='en',
+            # enable_mkldnn=False,
             use_gpu=False,
             show_log=False,
-            det_limit_side_len=1216
+            det_limit_side_len=960
         )
-
 
         ocr_type = "paddle"
         return "paddle"
@@ -869,28 +844,42 @@ def extract_bill_data(image_path):
         else:
             crop = get_crop(image, region_name)
         
-        if crop is None or crop.size == 0 or crop.shape[0] < 10 or crop.shape[1] < 10:
+        if crop is None:
             return ""
-
         preprocessed = preprocess_for_ocr(crop)
         
-        ocr_lines = []
         if ocr_type == "paddle":
             try:
                 result = ocr_engine.ocr(preprocessed)
-                if result and result[0]:
-                    for line in result[0]:
-                        text = line[1][0].strip()
-                        conf = line[1][1]
-                        
-                        # Confidence Filter (80%)
-                        if conf > 0.80:
-                            # Split merged words (H.NO214 -> H.NO 214)
-                            text = re.sub(r'([A-Z])([0-9])', r'\1 \2', text)
-                            text = re.sub(r'([0-9])([A-Z])', r'\1 \2', text)
-                            
-                            if text: ocr_lines.append(text)
-                return "\n".join(ocr_lines)
+                if not result or not result[0]:
+                    return ""
+                
+                # Group by Y-coordinate (tolerance of 10 pixels)
+                lines = []
+                # result[0] is list of [[box], [text, conf]]
+                sorted_res = sorted(result[0], key=lambda x: x[0][0][1])
+                
+                if not sorted_res: return ""
+                
+                current_line = []
+                last_y = sorted_res[0][0][0][1]
+                
+                for res in sorted_res:
+                    box = res[0]
+                    text = res[1][0]
+                    y = box[0][1]
+                    
+                    if abs(y - last_y) > 10:
+                        lines.append(" ".join(current_line))
+                        current_line = [text]
+                        last_y = y
+                    else:
+                        current_line.append(text)
+                
+                if current_line:
+                    lines.append(" ".join(current_line))
+                    
+                return "\n".join(lines)
             except:
                 pass
         
@@ -942,9 +931,10 @@ def extract_bill_data(image_path):
         data["late_amount"] = g_late_amt
 
     if not data.get("current_reading"):
-        readings_fallback = extract_reading_info(global_text)
+        readings_fallback = extract_reading_info(global_text, is_global=True)
         if readings_fallback.get("current_reading"):
             data.update(readings_fallback)
+
 
 
         

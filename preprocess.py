@@ -12,23 +12,16 @@ def preprocess_for_ocr(image):
     # Convert to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
-    # Denoising
-    denoised = cv2.fastNlMeansDenoising(gray)
+    # Increase contrast
+    alpha = 1.3 # Contrast control
+    beta = 0    # Brightness control
+    adjusted = cv2.convertScaleAbs(gray, alpha=alpha, beta=beta)
     
-    # Adaptive Thresholding
-    thresh = cv2.adaptiveThreshold(
-        denoised, 
-        255, 
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-        cv2.THRESH_BINARY, 
-        11, 
-        2
-    )
+    # Sharpening kernel (mild)
+    kernel = np.array([[0,-1,0], [-1,5,-1], [0,-1,0]])
+    sharpened = cv2.filter2D(adjusted, -1, kernel)
     
-    return thresh
-
-
-
+    return sharpened
 
 
 def resize_image(image, width=None, height=None, inter=cv2.INTER_AREA):

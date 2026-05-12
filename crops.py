@@ -16,8 +16,8 @@ BILL_REGIONS = {
         "x": (15, 880)
     },
     "readings": { # Reading table values
-        "y": (450, 650), 
-        "x": (15, 880)
+        "y": (440, 670), 
+        "x": (10, 885)
     },
     "monthly_history": { # Monthly Graph
         "y": (650, 1100), 
