@@ -269,7 +269,7 @@ def extract_with_ensemble(
 
         llama_response = g_client.chat.completions.create(
 
-            model="llama-3.1-70b-versatile",
+            model="llama-3.3-70b-versatile",
 
             messages=[
                 {
