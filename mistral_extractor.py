@@ -3,6 +3,10 @@ import base64
 import json
 import re
 from mistralai import Mistral
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 def encode_image(image_path):
     """Encodes an image file to base64."""

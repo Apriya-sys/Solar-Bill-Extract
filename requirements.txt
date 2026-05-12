@@ -9,4 +9,6 @@ numpy<2
 pdf2image
 pytesseract
 onnxruntime
-mistralai
+mistralai
+python-dotenv
+
