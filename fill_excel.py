@@ -134,13 +134,35 @@ def fill_excel_multi(all_data):
         for index in range(13): # Show 13 rows like in original
             row_idx = start_row + index + 1
             ws.cell(row=row_idx, column=2).value = index + 2
-            
-            if index < len(monthly_history):
-                item = monthly_history[index]
-                m_short = item.get("month", "")
-                ws.cell(row=row_idx, column=3).value = month_map.get(m_short, m_short)
-                ws.cell(row=row_idx, column=4).value = item.get("units", 0)
-                total_units += item.get("units", 0)
+                    
+        if index < len(monthly_history):
+
+            item = monthly_history[index]
+
+            m_short = item.get("month", "")
+
+            ws.cell(
+                row=row_idx,
+                column=3
+            ).value = month_map.get(
+                m_short,
+                m_short
+            )
+
+            units_value = item.get("units", 0)
+
+            try:
+                units_value = int(units_value)
+
+            except:
+                units_value = 0
+
+            ws.cell(
+                row=row_idx,
+                column=4
+            ).value = units_value
+
+            total_units += units_value
             
             for col in range(2, 7):
                 ws.cell(row=row_idx, column=col).border = border
