@@ -28,27 +28,32 @@ if uploaded_files:
     os.makedirs("assets", exist_ok=True)
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("🤖 AI Extraction Settings")
-    use_ai = st.sidebar.toggle("Enable Mistral AI (High Accuracy)", value=False)
+    st.sidebar.subheader("🤖 AI Ensemble Settings")
+    use_ai = st.sidebar.toggle("Enable AI Ensemble (Mistral + Llama)", value=True)
     mistral_key = st.sidebar.text_input("Mistral API Key", type="password", help="Get your key at console.mistral.ai")
+    groq_key = st.sidebar.text_input("Groq API Key", type="password", help="Get your key at console.groq.com")
 
-    if use_ai and not mistral_key:
-        st.sidebar.warning("⚠️ Please provide a Mistral API Key to use AI mode.")
+    if use_ai and (not mistral_key or not groq_key):
+        st.sidebar.warning("⚠️ Please provide BOTH Mistral and Groq API Keys for Ensemble mode.")
 
     all_data = []
 
     for uploaded_file in uploaded_files:
-        file_path = os.path.join("assets", uploaded_file.name)
-
-        with open(file_path, "wb") as f:
+        # Save uploaded file temporarily
+        with open(uploaded_file.name, "wb") as f:
             f.write(uploaded_file.getbuffer())
-
+        
+        file_path = os.path.abspath(uploaded_file.name)
+        
         st.success(f"✅ Uploaded: {uploaded_file.name}")
-
-        with st.spinner(f"Extracting data from {uploaded_file.name}..."):
-            api_key = mistral_key if use_ai else None
-            data = extract_bill_data(file_path, mistral_api_key=api_key)
+        
+        with st.spinner(f"Extracting data using AI Ensemble ({uploaded_file.name})..."):
+            # Pass Keys if AI mode is enabled
+            m_key = mistral_key if use_ai else None
+            g_key = groq_key if use_ai else None
+            data = extract_bill_data(file_path, mistral_api_key=m_key, groq_api_key=g_key)
             all_data.append(data)
+
 
         st.markdown(f"#### 📄 {uploaded_file.name}")
 

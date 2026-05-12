@@ -11,4 +11,6 @@ pytesseract
 onnxruntime
 mistralai
 python-dotenv
+groq
+
 
