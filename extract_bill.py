@@ -878,23 +878,24 @@ def extract_bill_data(image_path):
         if ocr_type == "paddle":
             try:
                 result = ocr_engine.ocr(preprocessed)
-                from preprocess import clean_ocr_text
                 if result and result[0]:
                     for line in result[0]:
                         text = line[1][0].strip()
-                        confidence = line[1][1]
+                        conf = line[1][1]
                         
-                        # Only accept high-confidence results (> 0.80)
-                        if confidence > 0.80:
-                            cleaned_text = clean_ocr_text(text)
-                            if cleaned_text:
-                                ocr_lines.append(cleaned_text)
+                        # Confidence Filter (80%)
+                        if conf > 0.80:
+                            # Split merged words (H.NO214 -> H.NO 214)
+                            text = re.sub(r'([A-Z])([0-9])', r'\1 \2', text)
+                            text = re.sub(r'([0-9])([A-Z])', r'\1 \2', text)
+                            
+                            if text: ocr_lines.append(text)
                 return "\n".join(ocr_lines)
-            except Exception as e:
+            except:
                 pass
-
         
-        return "" # Tesseract removed as it's not installed
+        return ""
+
 
     # 3. Extract Each Region
     data = {}

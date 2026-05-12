@@ -3,6 +3,9 @@ import cv2
 import numpy as np
 
 def preprocess_for_ocr(image):
+    """
+    Applies minimal preprocessing to an image/crop to improve OCR accuracy.
+    """
     if image is None:
         return None
         
@@ -14,18 +17,15 @@ def preprocess_for_ocr(image):
     
     # Adaptive Thresholding
     thresh = cv2.adaptiveThreshold(
-        denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-        cv2.THRESH_BINARY, 11, 2
+        denoised, 
+        255, 
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+        cv2.THRESH_BINARY, 
+        11, 
+        2
     )
     
     return thresh
-
-def clean_ocr_text(text):
-    if not text: return ""
-    # Separate letters and numbers (Merged Words fix)
-    text = re.sub(r'([A-Z])([0-9])', r'\1 \2', text)
-    text = re.sub(r'([0-9])([A-Z])', r'\1 \2', text)
-    return text
 
 
 
