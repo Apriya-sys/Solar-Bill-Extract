@@ -826,12 +826,25 @@ def extract_monthly_history(image_path):
 # Modular extractors are imported at the top
 
 
-def extract_bill_data(image_path):
+from mistral_extractor import extract_with_mistral
+
+def extract_bill_data(image_path, mistral_api_key=None):
     """
-    Main orchestration function for region-based bill extraction.
+    Main orchestration function.
+    Uses Mistral AI if API key is provided, otherwise falls back to regional OCR.
     """
-    # 1. Load Image
+    # 1. AI Extraction (Preferred)
+    if mistral_api_key:
+        print(f"--- Using Mistral AI Extraction for {image_path} ---")
+        ai_data = extract_with_mistral(image_path, mistral_api_key)
+        if "error" not in ai_data:
+            return ai_data
+        else:
+            print(f"AI Extraction failed: {ai_data['error']}. Falling back to standard OCR.")
+
+    # 2. Standard Region-based OCR Fallback
     image = cv2.imread(image_path)
+
     if image is None:
         return {"error": "Could not read image"}
         
