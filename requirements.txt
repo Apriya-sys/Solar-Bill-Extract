@@ -2,6 +2,6 @@ streamlit
 pandas
 openpyxl
 Pillow
-mistralai
+mistralai>=1.1.0
 python-dotenv
 groq
