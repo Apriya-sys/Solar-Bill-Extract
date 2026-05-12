@@ -19,7 +19,32 @@ from extractors.meter import extract_meter_info
 from extractors.readings import extract_reading_info
 from extractors.amounts import extract_amount_info
 from extractors.monthly_history import extract_history
-from validations import clean_data, validate_units, validate_amounts, validate_consumer_number
+# Validation functions moved here to avoid import issues
+def validate_units(current, previous, units):
+    try:
+        cur = float(current)
+        prev = float(previous)
+        u = float(units)
+        return abs((cur - prev) - u) < 0.01
+    except: return False
+
+def validate_amounts(bill_amount, late_amount):
+    try:
+        ba = float(bill_amount)
+        la = float(late_amount)
+        return la >= ba
+    except: return False
+
+def validate_consumer_number(consumer_number):
+    if not consumer_number: return False
+    return str(consumer_number).startswith("43") and len(str(consumer_number)) == 12
+
+def clean_data(data):
+    for key in data:
+        if isinstance(data[key], str):
+            data[key] = data[key].strip()
+    return data
+
 
 
 # =========================================================
