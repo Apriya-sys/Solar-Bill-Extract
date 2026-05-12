@@ -24,6 +24,8 @@ def preprocess_for_ocr(image):
     return sharpened
 
 
+
+
 def resize_image(image, width=None, height=None, inter=cv2.INTER_AREA):
     """
     Resizes an image while maintaining aspect ratio.

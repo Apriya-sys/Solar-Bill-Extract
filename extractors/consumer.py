@@ -22,32 +22,29 @@ def extract_consumer_info(ocr_text):
     # We'll skip lines that look like labels.
     labels = ["ग्राहक", "क्रमांक", "CONSUMER", "NUMBER", "NO", "BILL", "MSEDCL", "MAHAVITARAN"]
     
+    name_line = ""
     for line in lines:
         upper = line.upper()
         if any(label in upper for label in labels) and re.search(r'\d{12}', line):
-            continue # This is the consumer number line
+            continue 
             
-        if not consumer_name:
-            # Check if it looks like a name
-            # Names usually have more letters than numbers
-            letters = sum(c.isalpha() for c in line)
-            digits = sum(c.isdigit() for c in line)
-            
-            # Common prefixes for MSEDCL names
-            prefixes = ["SHRI", "SMT", "MRS", "MR", "M/S", "DR", "KU"]
-            is_prefixed = any(upper.startswith(p) for p in prefixes)
-            
-            if (letters > 10 and digits < 10) or is_prefixed:
-                consumer_name = line
-        else:
-            # Following lines are address
-            if len(address_lines) < 3:
-                address_lines.append(line)
+        # Skip purely numeric or very short lines
+        if re.match(r'^[\d\W_]+$', line) or len(line) < 3:
+            continue
+        # Skip obvious address lines
+        if any(kw in line.upper() for kw in ["NAGAR", "H.NO", "PLOT", "ROAD", "441912", "TUMSAR"]):
+            continue
+        # If we see "SHRI" or "MRS" or "MR", it's a high-confidence name
+        if any(p in line.upper() for p in ["SHRI", "MRS", "MR ", "MISS"]):
+            name_line = line
+            break
+        # Otherwise, take the first non-address line
+        if not name_line:
+            name_line = line
 
-            
     return {
         "consumer_number": consumer_number,
-        "consumer_name": consumer_name,
-        "address": " ".join(address_lines)
+        "consumer_name": name_line,
+        "address": "\n".join(lines[lines.index(name_line)+1:]) if name_line in lines else ocr_text
     }
 
