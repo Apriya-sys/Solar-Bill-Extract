@@ -50,11 +50,22 @@ if uploaded_files:
 
         with col1:
             for key in left_fields:
-                st.markdown(f"**{key}:** `{data.get(key, '')}`")
+                val = data.get(key, '')
+                if key == "consumer_number" and not data.get("valid_consumer", True):
+                    st.error(f"**{key}:** `{val}` (Invalid Format)")
+                else:
+                    st.markdown(f"**{key}:** `{val}`")
 
         with col2:
             for key in right_fields:
-                st.markdown(f"**{key}:** `{data.get(key, '')}`")
+                val = data.get(key, '')
+                if key == "units" and not data.get("valid_units", True):
+                    st.warning(f"**{key}:** `{val}` (Unit Mismatch)")
+                elif key == "late_amount" and not data.get("valid_amounts", True):
+                    st.warning(f"**{key}:** `{val}` (Amount Mismatch)")
+                else:
+                    st.markdown(f"**{key}:** `{val}`")
+
         # -------------------------------------------------
 # MONTHLY HISTORY DISPLAY 
 # -------------------------------------------------

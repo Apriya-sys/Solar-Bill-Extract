@@ -809,47 +809,121 @@ def extract_monthly_history(image_path):
 # MAIN EXTRACTION FUNCTION
 # =========================================================
 
+from preprocess import preprocess_for_ocr
+from crops import get_crop
+from extractors.consumer import extract_consumer_info
+from extractors.meter import extract_meter_info
+from extractors.readings import extract_reading_info
+from extractors.amounts import extract_amount_info
+from extractors.monthly_history import extract_history
+from validations import clean_data, validate_units, validate_amounts, validate_consumer_number
+
 def extract_bill_data(image_path):
+    """
+    Main orchestration function for region-based bill extraction.
+    """
+    # 1. Load Image
+    image = cv2.imread(image_path)
+    if image is None:
+        return {"error": "Could not read image"}
+        
+    # 2. OCR Engine (Deferred Initialization)
+    ocr_type = initialize_ocr()
+    
+    def get_text_from_region(region_name, full_image=None):
+        if full_image is not None:
+            crop = full_image
+        else:
+            crop = get_crop(image, region_name)
+        
+        if crop is None:
+            return ""
+        preprocessed = preprocess_for_ocr(crop)
+        
+        ocr_lines = []
+        if ocr_type == "paddle":
+            try:
+                result = ocr_engine.ocr(preprocessed)
+                if result and result[0]:
+                    for line in result[0]:
+                        text = line[1][0].strip()
+                        if text: ocr_lines.append(text)
+                return "\n".join(ocr_lines)
+            except:
+                pass
+        
+        return "" # Tesseract removed as it's not installed
 
-    # ── OCR ───────────────────────────────────────────────
-    ocr_lines = get_ocr_lines(image_path)
-    full_text = "\n".join(ocr_lines)
-
-    print("\n========== OCR TEXT ==========\n")
-    print(full_text)
-
-    # ── EXTRACT ───────────────────────────────────────────
+    # 3. Extract Each Region
     data = {}
-
-    data["consumer_number"] = extract_consumer_number(ocr_lines, full_text)
-
-    name, address = extract_name_and_address(ocr_lines)
-    data["consumer_name"] = name
-    data["address"]        = address
-
-    data["meter_number"] = extract_meter_number(ocr_lines, full_text)
-    data["load_kw"]      = extract_load_kw(ocr_lines, full_text)
-    data["tariff"]       = extract_tariff(ocr_lines)
-
-    bill_date, due_date = extract_dates(ocr_lines, full_text)
+    
+    # Consumer Region
+    consumer_text = get_text_from_region("consumer")
+    data.update(extract_consumer_info(consumer_text))
+    
+    # Meter Region
+    meter_text = get_text_from_region("meter_info")
+    data.update(extract_meter_info(meter_text))
+    
+    # Readings Region
+    readings_text = get_text_from_region("readings")
+    data.update(extract_reading_info(readings_text))
+    
+    # Bill Details (Dates and Amounts)
+    details_text = get_text_from_region("bill_details")
+    data.update(extract_amount_info(details_text))
+    
+    # Dates from combined or specific section
+    from regex_extractors import get_bill_and_due_dates, get_consumer_number, get_meter_number, get_load_kw, get_amounts_with_labels
+    bill_date, due_date = get_bill_and_due_dates(details_text) 
     data["bill_date"] = bill_date
-    data["due_date"]  = due_date
+    data["due_date"] = due_date
 
-    cur, prev, units = extract_readings(ocr_lines, full_text)
-    data["current_reading"]  = cur
-    data["previous_reading"] = prev
-    data["units"]            = units
-
-    bill_amt, late_amt = extract_amounts(ocr_lines, full_text)
-    data["bill_amount"] = bill_amt
-    data["late_amount"] = late_amt
+    # --- GLOBAL REFINEMENT ---
+    global_text = get_text_from_region(None, full_image=image)
     
-    data["fixed_charges"] = extract_fixed_charges(ocr_lines)
+    if not data.get("consumer_number"):
+        data["consumer_number"] = get_consumer_number(global_text)
+    if not data.get("meter_number"):
+        data["meter_number"] = get_meter_number(global_text)
+    if not data.get("load_kw"):
+        data["load_kw"] = get_load_kw(global_text)
+        
+    g_bill_date, g_due_date = get_bill_and_due_dates(global_text)
+    if not data.get("bill_date"): data["bill_date"] = g_bill_date
+    if not data.get("due_date"): data["due_date"] = g_due_date
+        
+    if not data.get("bill_amount"):
+        g_bill_amt, g_late_amt = get_amounts_with_labels(global_text)
+        data["bill_amount"] = g_bill_amt
+        data["late_amount"] = g_late_amt
+
+    if not data.get("current_reading"):
+        readings_fallback = extract_reading_info(global_text)
+        if readings_fallback.get("current_reading"):
+            data.update(readings_fallback)
+
+
+        
+
+    # Monthly History
+
+    history_crop = get_crop(image, "monthly_history")
+    data["monthly_history"] = extract_history(history_crop, ocr_engine=ocr_engine, ocr_type=ocr_type)
+
+
     
-    monthly_history = extract_monthly_history(image_path)
-
-    data["monthly_history"] = monthly_history
-
+    # 4. Final Processing & Validation
+    data = clean_data(data)
+    
+    # Add validation flags
+    data["valid_units"] = validate_units(data.get("current_reading"), data.get("previous_reading"), data.get("units"))
+    data["valid_amounts"] = validate_amounts(data.get("bill_amount"), data.get("late_amount"))
+    data["valid_consumer"] = validate_consumer_number(data.get("consumer_number"))
+    
+    # Fixed charges fallback
+    data["fixed_charges"] = extract_fixed_charges([]) 
+    
     # ── PRINT RESULT ──────────────────────────────────────
     print("\n========== EXTRACTED DATA ==========\n")
     fields = [
