@@ -19,7 +19,8 @@ from extractors.meter import extract_meter_info
 from extractors.readings import extract_reading_info
 from extractors.amounts import extract_amount_info
 from extractors.monthly_history import extract_history
-from validations import validate_units, validate_amounts, validate_consumer_number
+from validations import clean_data, validate_units, validate_amounts, validate_consumer_number
+
 
 # =========================================================
 # OCR ENGINE INITIALIZATION (DEFERRED)
