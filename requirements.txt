@@ -2,6 +2,8 @@ streamlit
 pandas
 openpyxl
 Pillow
+opencv-python
+numpy
 mistralai>=1.1.0
 python-dotenv
 groq
