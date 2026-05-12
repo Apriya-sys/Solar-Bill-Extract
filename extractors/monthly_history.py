@@ -1,67 +1,71 @@
 import cv2
+import pytesseract
 import re
 from preprocess import preprocess_for_ocr
 
-def extract_history(image_crop, ocr_engine=None, ocr_type=None, full_text=None):
+def extract_history(image_crop, ocr_engine=None, ocr_type=None):
     """
-    Extracts monthly units from the graph region, with an optional full_text fallback.
+    Extracts monthly units from the graph region.
     """
-    if image_crop is None and not full_text:
+    if image_crop is None:
         return []
         
-    items = []
-    if image_crop is not None:
-        preprocessed = preprocess_for_ocr(image_crop)
-        if ocr_type == "paddle" and ocr_engine:
-            try:
-                result = ocr_engine.ocr(preprocessed)
-                if result and result[0]:
-                    items = sorted(result[0], key=lambda x: (x[0][0][1], x[0][0][0]))
-            except: pass
-            
-    # If no items found from crop, try regex on full text
-    if not items and full_text:
-        return regex_history_search(full_text)
-
-    marathi_to_eng = {
-        "जानेवारी": "January", "फेब्रुवारी": "February", "मार्च": "March",
-        "एप्रिल": "April", "मे": "May", "जून": "June",
-        "जुलै": "July", "ऑगस्ट": "August", "सप्टेंबर": "September",
-        "ऑक्टोबर": "October", "नोव्हेंबर": "November", "डिसेंबर": "December",
-        "JAN": "January", "FEB": "February", "MAR": "March", "APR": "April",
-        "MAY": "May", "JUN": "June", "JUL": "July", "AUG": "August",
-        "SEP": "September", "OCT": "October", "NOV": "November", "DEC": "December"
-    }
+    preprocessed = preprocess_for_ocr(image_crop)
     
-    extracted_pairs = []
-    for i, item in enumerate(items):
-        text = item[1][0].strip().upper()
-        
-        found_month = None
-        for m_key, m_val in marathi_to_eng.items():
-            if m_key in text:
-                found_month = m_val
-                break
-        
-        if found_month:
-            # Look for adjacent number
-            current_y = item[0][0][1]
-            for j in range(i + 1, min(i + 5, len(items))):
-                other_text = items[j][1][0].strip()
-                other_y = items[j][0][0][1]
-                if re.match(r'^\d+$', other_text) and abs(other_y - current_y) < 50:
-                    extracted_pairs.append({"month": found_month, "units": int(other_text)})
-                    break
+    # OCR
+    history_text = ""
+    if ocr_type == "paddle" and ocr_engine:
+        try:
+            result = ocr_engine.ocr(preprocessed)
+            if result and result[0]:
+                history_text = "\n".join([line[1][0] for line in result[0]])
+        except:
+            pass
+            
+    if not history_text:
+        try:
+            from PIL import Image
+            pil_img = Image.fromarray(preprocessed)
+            config = r'--oem 3 --psm 6'
+            history_text = pytesseract.image_to_string(pil_img, lang="eng+mar", config=config)
+        except Exception as e:
+            print(f"OCR failed for history: {e}")
+            return []
+    
+    lines = history_text.splitlines()
+    units_found = []
+    
+    for line in lines:
+        numbers = re.findall(r'\d+', line)
+        for n in numbers:
+            value = int(n)
+            if 0 < value <= 500:
+                units_found.append(value)
+                
+    # Keep last 12 values
+    units_found = units_found[-12:]
+    
+    # Dynamic month calculation fallback
+    from datetime import datetime, timedelta
+    current_date = datetime.now()
+    months_found = []
+    for i in range(12, 0, -1):
+        d = current_date - timedelta(days=30 * i)
+        months_found.append(d.strftime("%B %Y"))
+    
+    # If OCR found months, use them (simplified regex)
+    ocr_months = re.findall(r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*\d{2,4}', history_text)
+    if len(ocr_months) >= 6:
+        # Format the OCR months nicely
+        months_found = ocr_months[-12:]
 
-    return extracted_pairs
+    history = []
+    for i, unit in enumerate(units_found):
+        m_label = months_found[i] if i < len(months_found) else "Unknown"
+        history.append({
+            "month": m_label,
+            "units": unit
+        })
+            
+    return history
 
-def regex_history_search(text):
-    """Search for month-unit patterns in raw text."""
-    results = []
-    months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
-    for m in months:
-        # Match "JAN 250" or "JAN-250" or "JAN:250"
-        match = re.search(rf'{m}[^0-9]*(\d{{1,4}})', text.upper())
-        if match:
-            results.append({"month": m, "units": int(match.group(1))})
-    return results
