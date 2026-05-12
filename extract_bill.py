@@ -64,15 +64,13 @@ def initialize_ocr():
         from paddleocr import PaddleOCR
 
         ocr_engine = PaddleOCR(
-            use_angle_cls=False,
+            use_angle_cls=True,
             lang='en',
-            # enable_mkldnn=False,
             use_gpu=False,
             show_log=False,
             det_limit_side_len=1216
-
-
         )
+
 
         ocr_type = "paddle"
         return "paddle"
@@ -880,13 +878,21 @@ def extract_bill_data(image_path):
         if ocr_type == "paddle":
             try:
                 result = ocr_engine.ocr(preprocessed)
+                from preprocess import clean_ocr_text
                 if result and result[0]:
                     for line in result[0]:
                         text = line[1][0].strip()
-                        if text: ocr_lines.append(text)
+                        confidence = line[1][1]
+                        
+                        # Only accept high-confidence results (> 0.80)
+                        if confidence > 0.80:
+                            cleaned_text = clean_ocr_text(text)
+                            if cleaned_text:
+                                ocr_lines.append(cleaned_text)
                 return "\n".join(ocr_lines)
-            except:
+            except Exception as e:
                 pass
+
         
         return "" # Tesseract removed as it's not installed
 

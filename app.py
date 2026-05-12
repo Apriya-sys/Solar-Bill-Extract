@@ -1,6 +1,8 @@
-import streamlit as st
 import os
+os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+import streamlit as st
+
 from extract_bill import extract_bill_data
 from fill_excel import fill_excel_multi
 
