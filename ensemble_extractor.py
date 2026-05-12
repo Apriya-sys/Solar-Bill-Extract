@@ -2,8 +2,12 @@ import os
 import base64
 import json
 import re
-from mistralai import Mistral
+try:
+    from mistralai import Mistral
+except ImportError:
+    from mistralai.client import Mistral
 from groq import Groq
+
 from dotenv import load_dotenv
 
 load_dotenv()
