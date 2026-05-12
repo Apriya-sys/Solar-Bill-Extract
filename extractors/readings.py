@@ -40,31 +40,26 @@ def extract_reading_info(ocr_text):
                 
                 # Filter out numbers that look like years (2024xx, 2025xx)
                 s1, s2 = str(n1), str(n2)
-                if len(s1) >= 4 and s1[:4] in ['2024', '2025', '2026'] and len(s2) >= 4 and s1[:4] == s2[:4]:
+                if s1.startswith(('2024', '2025', '2026')) and len(s1) <= 6:
                     continue
 
                 if n1 > n2 and n1 > 1000:
-
                     diff = n1 - n2
-                    if 5 < diff < 2000: # Realistic monthly units
+                    if 5 < diff < 1500: # Realistic monthly units
                         score = 0
                         # Check if diff exists in the text
-                        if str(diff) in all_nums: score += 20
+                        if str(diff) in all_nums: score += 30
+                        
+                        # Favor readings in the 10k-99k range (typical for these bills)
+                        if 10000 < n1 < 99999: score += 15
                         
                         # Check proximity to keywords
                         for kw in reading_keywords:
                             if kw.lower() in ocr_text.lower():
-                                # Very basic proximity: is it in the same text block?
                                 score += 5
                         
-                        # Penalize years
-                        if n1 in [2024, 2025, 2026] or n2 in [2024, 2025, 2026]:
-                            score -= 50
-                            
-                        # Favor larger readings (cumulative meters)
-                        if n1 > 5000: score += 10
-                        
                         candidates.append((n1, n2, diff, score))
+
             except: continue
             
     if candidates:

@@ -44,7 +44,8 @@ def initialize_ocr():
             # enable_mkldnn=False,
             use_gpu=False,
             show_log=False,
-            det_limit_side_len=960
+            det_limit_side_len=2000
+
         )
 
         ocr_type = "paddle"
