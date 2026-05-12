@@ -9,14 +9,18 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
-def extract_with_mistral(image_path, api_key):
+def extract_with_mistral(image_path, api_key=None):
     """
     Uses Mistral Pixtral to extract structured data from a bill image.
     """
-    if not api_key:
-        return {"error": "Mistral API Key is missing. Please provide it in the settings."}
+    # Use provided key or fallback to environment variable
+    final_api_key = api_key or os.environ.get("MISTRAL_API_KEY")
+    
+    if not final_api_key:
+        return {"error": "Mistral API Key is missing. Please provide it in the sidebar or set MISTRAL_API_KEY env var."}
 
-    client = Mistral(api_key=api_key)
+    client = Mistral(api_key=final_api_key)
+
     
     try:
         base64_image = encode_image(image_path)
