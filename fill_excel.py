@@ -56,11 +56,13 @@ def fill_excel_multi(all_data):
 
         # Row 2: Consumer No
         ws["B2"] = "Consumer No"
-        ws["D2"] = data.get("consumer_number", "")
+        ws["D2"] = str(data.get("consumer_number", ""))
         ws["B2"].font = bold
         ws["B2"].fill = header_fill
         ws["B2"].border = border
         ws["D2"].border = border
+        ws["D2"].number_format = '@'
+
 
         # Row 3: Fixed Charges
         ws["B3"] = "Fixed Charges"
@@ -80,11 +82,15 @@ def fill_excel_multi(all_data):
 
         # Row 5: Connection Type
         ws["B5"] = "Connection Type"
-        ws["D5"] = data.get("tariff", "")
+        ws["D5"] = data.get("tariff", "90/ LT I Res 1-Phase")
         ws["B5"].font = bold
         ws["B5"].fill = header_fill
         ws["B5"].border = border
         ws["D5"].border = border
+
+        # Row 6: Contract Demand
+        ws["B6"] = "Contract Demand (KVA) :"
+        ws["B6"].font = bold
 
         # Row 7: Solar Panel Used
         ws["B7"] = "Solar Pannel used"
@@ -99,10 +105,11 @@ def fill_excel_multi(all_data):
         # TABLE HEADER
         # -------------------------------------------------
 
-        start_row = 10
+        start_row = 9
         headers = ["Sr.No", "Month", "Units", "Bill Amount", "Unit Cost"]
+        cols = [2, 3, 4, 5, 6] # B, C, D, E, F
 
-        for col, header in enumerate(headers, start=2):
+        for col, header in zip(cols, headers):
             cell = ws.cell(row=start_row, column=col)
             cell.value = header
             cell.font = bold
@@ -116,28 +123,35 @@ def fill_excel_multi(all_data):
         monthly_history = data.get("monthly_history", [])
         total_units = 0
 
-        for index, item in enumerate(monthly_history):
+        # Mappings for full month names
+        month_map = {
+            "Feb 25": "February 2025", "Mar 25": "March 2025", "Apr 25": "April 2025",
+            "May 25": "May 2025", "Jun 25": "June 2025", "Jul 25": "July 2025",
+            "Aug 25": "August 2025", "Sep 25": "September 2025", "Oct 25": "October 2025",
+            "Nov 25": "November 2025", "Dec 25": "December 2025", "Jan 26": "January 2026"
+        }
+
+        for index in range(13): # Show 13 rows like in original
             row_idx = start_row + index + 1
             ws.cell(row=row_idx, column=2).value = index + 2
-            ws.cell(row=row_idx, column=3).value = item.get("month", "")
-            ws.cell(row=row_idx, column=4).value = item.get("units", 0)
+            
+            if index < len(monthly_history):
+                item = monthly_history[index]
+                m_short = item.get("month", "")
+                ws.cell(row=row_idx, column=3).value = month_map.get(m_short, m_short)
+                ws.cell(row=row_idx, column=4).value = item.get("units", 0)
+                total_units += item.get("units", 0)
             
             for col in range(2, 7):
                 ws.cell(row=row_idx, column=col).border = border
-
-            total_units += item.get("units", 0)
 
         # -------------------------------------------------
         # CALCULATIONS
         # -------------------------------------------------
 
-        calc_row = start_row + len(monthly_history) + 1
+        calc_row = start_row + 14 # Fixed position for calculations
 
-        if len(monthly_history) > 0:
-            avg_units = total_units / len(monthly_history)
-        else:
-            avg_units = 0
-
+        avg_units = total_units / len(monthly_history) if len(monthly_history) > 0 else 0
         kw = avg_units / 106
         solar_panels = kw / 0.6
         solar_capacity = round(solar_panels * 0.7, 1)
@@ -151,6 +165,9 @@ def fill_excel_multi(all_data):
             ("Number of Panels", num_panels),
         ]
 
+        # Formatting colors for bottom rows
+        solar_fill = PatternFill(start_color="FFCC99", end_color="FFCC99", fill_type="solid") # Orange-ish
+
         for label, value in calculations:
             ws.cell(row=calc_row, column=3).value = label
             ws.cell(row=calc_row, column=4).value = value
@@ -159,8 +176,10 @@ def fill_excel_multi(all_data):
             ws.cell(row=calc_row, column=4).border = border
             
             if label == "Solar capacity":
+                ws.cell(row=calc_row, column=3).fill = solar_fill
                 ws.cell(row=calc_row, column=4).fill = yellow_fill
             if label == "Number of Panels":
+                ws.cell(row=calc_row, column=3).fill = green_fill
                 ws.cell(row=calc_row, column=4).fill = green_fill
 
             calc_row += 1
@@ -172,12 +191,13 @@ def fill_excel_multi(all_data):
         ws.cell(row=calc_row+3, column=4).value = num_panels * 2
 
         # Column widths
-        ws.column_dimensions["A"].width = 10
+        ws.column_dimensions["A"].width = 5
         ws.column_dimensions["B"].width = 25
-        ws.column_dimensions["C"].width = 30
+        ws.column_dimensions["C"].width = 35
         ws.column_dimensions["D"].width = 25
         ws.column_dimensions["E"].width = 15
         ws.column_dimensions["F"].width = 15
+
 
     # -------------------------------------------------
     # SAVE
