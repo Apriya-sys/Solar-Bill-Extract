@@ -44,8 +44,9 @@ def extract_consumer_info(ocr_text):
 
     return {
         "consumer_number": consumer_number,
-        "consumer_name": name_line,
-        "address": "\n".join(lines[lines.index(name_line)+1:]) if name_line in lines else ocr_text
+        "consumer_name": name_line or "NAME NOT FOUND",
+        "address": "\n".join(lines[lines.index(name_line)+1:]) if (name_line and name_line in lines) else ocr_text
     }
+
 
 

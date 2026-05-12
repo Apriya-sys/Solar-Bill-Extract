@@ -44,7 +44,8 @@ def initialize_ocr():
             # enable_mkldnn=False,
             use_gpu=False,
             show_log=False,
-            det_limit_side_len=2000
+            det_limit_side_len=1216
+
 
         )
 
@@ -845,8 +846,9 @@ def extract_bill_data(image_path):
         else:
             crop = get_crop(image, region_name)
         
-        if crop is None:
+        if crop is None or crop.size == 0 or crop.shape[0] < 10 or crop.shape[1] < 10:
             return ""
+
         preprocessed = preprocess_for_ocr(crop)
         
         ocr_lines = []
