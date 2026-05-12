@@ -22,7 +22,25 @@ def extract_bill_data(image_path, mistral_api_key=None, groq_api_key=None):
     # Add validation flags
     data["valid_units"] = validate_units(data.get("current_reading"), data.get("previous_reading"), data.get("units"))
     data["valid_amounts"] = validate_amounts(data.get("bill_amount"), data.get("late_amount"))
-    data["valid_consumer"] = validate_consumer_number(data.get("consumer_number"))
+    # Fix consumer number length
+
+    consumer_no = str(
+        data.get("consumer_number", "")
+    )
+
+    # Keep only digits
+    consumer_no = "".join(
+        filter(str.isdigit, consumer_no)
+    )
+
+    # Maharashtra bills usually 11 digits
+    if len(consumer_no) > 11:
+        consumer_no = consumer_no[-11:]
+
+    data["consumer_number"] = consumer_no
+    data["valid_consumer"] = validate_consumer_number(
+    data.get("consumer_number")
+)
     
     # Default fallback for fixed charges if missing
     if not data.get("fixed_charges"):

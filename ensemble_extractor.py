@@ -218,6 +218,19 @@ def extract_with_ensemble(
 
         Extract:
 
+        IMPORTANT FIELD RULES:
+
+        - "A50" is NOT meter number.
+        - "A50" is NOT tariff.
+        - Meter number is usually 10-15 digit numeric.
+        - Tariff usually contains LT/Res/Phase.
+        - Units = current_reading - previous_reading.
+        - Load KW may appear as:
+        - Sanctioned Load
+        - Load
+        - Connected Load
+        - Extract monthly history exactly as shown.
+
         1. consumer_name
         2. consumer_number
         3. meter_number

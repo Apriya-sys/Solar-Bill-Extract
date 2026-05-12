@@ -73,16 +73,30 @@ def fill_excel_multi(all_data):
         ws["D3"].border = border
 
         # Row 4: Sanct. Load (kW)
+        # Row 4: Sanct. Load (kW)
+
+        load_value = data.get("load_kw", "")
+
+        if not load_value:
+            load_value = "3"
+
         ws["B4"] = "Sanct. Load (kW)"
-        ws["D4"] = f"{data.get('load_kw', '')}KW"
+        ws["D4"] = f"{load_value} KW"
         ws["B4"].font = bold
         ws["B4"].fill = header_fill
         ws["B4"].border = border
         ws["D4"].border = border
 
         # Row 5: Connection Type
+        # Row 5: Connection Type
+
+        tariff_value = data.get("tariff", "")
+
+        if tariff_value == "A50" or not tariff_value:
+            tariff_value = "90/LT I Res 1-Phase"
+
         ws["B5"] = "Connection Type"
-        ws["D5"] = data.get("tariff", "90/ LT I Res 1-Phase")
+        ws["D5"] = tariff_value
         ws["B5"].font = bold
         ws["B5"].fill = header_fill
         ws["B5"].border = border
@@ -125,10 +139,36 @@ def fill_excel_multi(all_data):
 
         # Mappings for full month names
         month_map = {
-            "Feb 25": "February 2025", "Mar 25": "March 2025", "Apr 25": "April 2025",
-            "May 25": "May 2025", "Jun 25": "June 2025", "Jul 25": "July 2025",
-            "Aug 25": "August 2025", "Sep 25": "September 2025", "Oct 25": "October 2025",
-            "Nov 25": "November 2025", "Dec 25": "December 2025", "Jan 26": "January 2026"
+
+            "JAN 2024": "January 2024",
+            "FEB 2024": "February 2024",
+            "MAR 2024": "March 2024",
+            "APR 2024": "April 2024",
+            "MAY 2024": "May 2024",
+            "JUN 2024": "June 2024",
+            "JUL 2024": "July 2024",
+            "AUG 2024": "August 2024",
+            "SEP 2024": "September 2024",
+            "OCT 2024": "October 2024",
+            "NOV 2024": "November 2024",
+            "DEC 2024": "December 2024",
+
+            "JAN 2025": "January 2025",
+            "FEB 2025": "February 2025",
+            "MAR 2025": "March 2025",
+            "APR 2025": "April 2025",
+            "MAY 2025": "May 2025",
+            "JUN 2025": "June 2025",
+            "JUL 2025": "July 2025",
+            "AUG 2025": "August 2025",
+            "SEP 2025": "September 2025",
+            "OCT 2025": "October 2025",
+            "NOV 2025": "November 2025",
+            "DEC 2025": "December 2025",
+
+            "JAN 2026": "January 2026",
+            "FEB 2026": "February 2026",
+            "MAR 2026": "March 2026"
         }
 
         for index in range(13): # Show 13 rows like in original
