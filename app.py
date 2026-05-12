@@ -82,17 +82,20 @@ if uploaded_files:
                     f"{item['month']} : {item['units']} Units"
                 )
 
-                st.divider()
+        st.divider()
 
-            if all_data:
-                output_file = fill_excel_multi(all_data)
+    if all_data:
+        st.markdown("---")
+        st.subheader("📊 Final Report")
+        output_file = fill_excel_multi(all_data)
 
-                st.success(f"✅ Excel generated with {len(all_data)} bill(s)")
+        st.success(f"✅ Data extracted from {len(all_data)} bill(s). Click below to download the final report.")
 
-                with open(output_file, "rb") as f:
-                    st.download_button(
-                        label="📥 Download Excel File",
-                        data=f,
-                        file_name=os.path.basename(output_file),
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    )
+        with open(output_file, "rb") as f:
+            st.download_button(
+                label="📥 Download Excel File",
+                data=f,
+                file_name=os.path.basename(output_file),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
