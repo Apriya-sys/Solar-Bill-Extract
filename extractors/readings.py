@@ -24,26 +24,36 @@ def extract_reading_info(ocr_text):
     all_nums = re.findall(r'\b\d{1,6}\b', processed_text)
     
     candidates = []
+    # Keywords to search for proximity
+    reading_keywords = ["चालू", "मागील", "Current", "Previous", "Units", "युनिट", "वापर"]
+    
     for i in range(len(all_nums)):
         for j in range(len(all_nums)):
             if i == j: continue
             try:
                 n1 = int(all_nums[i]) # Potential Current
                 n2 = int(all_nums[j]) # Potential Previous
-                # Readings are typically > 1000 and <= 999999
-                if n1 > n2 and 1000 < n1 < 1000000 and 1000 < n2 < 1000000:
+                
+                if n1 > n2 and n1 > 1000:
                     diff = n1 - n2
-                    if 10 < diff < 5000: # Units are usually in this range
-                        # Score based on current reading value
-                        # and whether the diff (units) is found near keywords
+                    if 5 < diff < 2000: # Realistic monthly units
                         score = 0
-                        if str(diff) in all_nums: score += 10
-                        if str(diff) in ocr_text: score += 5
+                        # Check if diff exists in the text
+                        if str(diff) in all_nums: score += 20
                         
-                        # Penalize years (2024, 2025, 2026)
+                        # Check proximity to keywords
+                        for kw in reading_keywords:
+                            if kw.lower() in ocr_text.lower():
+                                # Very basic proximity: is it in the same text block?
+                                score += 5
+                        
+                        # Penalize years
                         if n1 in [2024, 2025, 2026] or n2 in [2024, 2025, 2026]:
-                            score -= 20
+                            score -= 50
                             
+                        # Favor larger readings (cumulative meters)
+                        if n1 > 5000: score += 10
+                        
                         candidates.append((n1, n2, diff, score))
             except: continue
             
@@ -51,11 +61,14 @@ def extract_reading_info(ocr_text):
         # Sort by score descending, then by current reading descending
         candidates.sort(key=lambda x: (x[3], x[0]), reverse=True)
         best = candidates[0]
-        return {
-            "current_reading": str(best[0]),
-            "previous_reading": str(best[1]),
-            "units": str(best[2])
-        }
+        # Only return if score is decent
+        if best[3] > 0:
+            return {
+                "current_reading": str(best[0]),
+                "previous_reading": str(best[1]),
+                "units": str(best[2])
+            }
+
 
 
             

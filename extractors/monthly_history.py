@@ -45,18 +45,27 @@ def extract_history(image_crop, ocr_engine=None, ocr_type=None):
     # Keep last 12 values
     units_found = units_found[-12:]
     
-    months_found = [
-        "Feb 25", "Mar 25", "Apr 25", "May 25", "Jun 25", 
-        "Jul 25", "Aug 25", "Sep 25", "Oct 25", "Nov 25", 
-        "Dec 25", "Jan 26"
-    ]
+    # Dynamic month calculation fallback
+    from datetime import datetime, timedelta
+    current_date = datetime.now()
+    months_found = []
+    for i in range(12, 0, -1):
+        d = current_date - timedelta(days=30 * i)
+        months_found.append(d.strftime("%B %Y"))
     
+    # If OCR found months, use them (simplified regex)
+    ocr_months = re.findall(r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*\d{2,4}', history_text)
+    if len(ocr_months) >= 6:
+        # Format the OCR months nicely
+        months_found = ocr_months[-12:]
+
     history = []
     for i, unit in enumerate(units_found):
-        if i < len(months_found):
-            history.append({
-                "month": months_found[i],
-                "units": unit
-            })
+        m_label = months_found[i] if i < len(months_found) else "Unknown"
+        history.append({
+            "month": m_label,
+            "units": unit
+        })
             
     return history
+
