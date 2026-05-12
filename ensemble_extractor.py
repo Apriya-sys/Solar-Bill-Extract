@@ -50,7 +50,7 @@ def extract_with_ensemble(image_path, mistral_key=None, groq_key=None):
         
         base64_image = encode_image(image_path)
         
-        ocr_prompt = "Extract all text from this electricity bill exactly. Preserve the tables and structure. Return the output in Markdown format."
+        ocr_prompt = "Perform high-fidelity OCR on this document. Extract all text, maintaining the layout and tabular structures. This is an electricity bill; ensure all numbers and dates are captured clearly. Return the result in Markdown."
         
         ocr_response = m_client.chat.complete(
             model="pixtral-12b-2409",
@@ -66,34 +66,47 @@ def extract_with_ensemble(image_path, mistral_key=None, groq_key=None):
         )
         
         markdown_text = ocr_response.choices[0].message.content
-        print("--- Mistral OCR Output (Markdown) ---")
-        # print(markdown_text)
         
         # Step 2: Llama Parsing (Groq)
         parsing_prompt = f"""
-        You are an expert data parser. Below is the text extracted from an MSEDCL Electricity Bill in Markdown format.
-        Parse this text and return ONLY a valid JSON object with these fields:
+        You are a Universal Bill Parser. Below is the OCR text of an electricity bill in Markdown format.
+        Your goal is to extract the billing data into a structured JSON format, regardless of the bill's specific layout or utility provider.
         
-        - consumer_name
-        - consumer_number (12 digits)
-        - meter_number
-        - fixed_charges (usually 130)
-        - load_kw (e.g. 3.30)
-        - tariff (e.g. 90/ LT I Res 1-Phase)
-        - bill_date (DD-MM-YYYY)
-        - due_date (DD-MM-YYYY)
-        - bill_amount
-        - late_amount
-        - current_reading
-        - previous_reading
-        - units
-        - monthly_history (List of objects: {{"month": "Jan 25", "units": 100}})
+        ### EXTRACTION RULES:
+        1. **Consumer Info**: Look for 'Consumer No', 'Account No', 'Service No', or 'CA No'. Map it to 'consumer_number'.
+        2. **Dates**: Find the Bill Date and Due Date. Use format DD-MM-YYYY.
+        3. **Readings**: Identify Current Reading, Previous Reading, and total Units Consumed.
+        4. **Amounts**: Extract the net Bill Amount and the amount payable After Due Date (Late Amount).
+        5. **Meter Info**: Find the Meter Number and Sanctioned Load (kW).
+        6. **Monthly History**: If there is a table or list of previous months and units, extract as many as possible (at least 6-12 months).
+        
+        ### REQUIRED JSON FORMAT:
+        {{
+            "consumer_name": "...",
+            "consumer_number": "...",
+            "meter_number": "...",
+            "fixed_charges": "...",
+            "load_kw": "...",
+            "tariff": "...",
+            "bill_date": "...",
+            "due_date": "...",
+            "bill_amount": "...",
+            "late_amount": "...",
+            "current_reading": "...",
+            "previous_reading": "...",
+            "units": "...",
+            "monthly_history": [
+                {{"month": "MMM YY", "units": 123}},
+                ...
+            ]
+        }}
         
         OCR TEXT:
         {markdown_text}
         
-        Return ONLY the JSON. No explanations.
+        Return ONLY the JSON object.
         """
+
         
         llama_response = g_client.chat.completions.create(
             model="llama-3.1-70b-versatile",
