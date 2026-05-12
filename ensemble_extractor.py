@@ -216,8 +216,6 @@ def extract_with_ensemble(
         - Units must be numeric only.
         - Preserve exact bill values.
 
-        Extract:
-
         IMPORTANT FIELD RULES:
 
         - "A50" is NOT meter number.
@@ -230,6 +228,8 @@ def extract_with_ensemble(
         - Load
         - Connected Load
         - Extract monthly history exactly as shown.
+
+        Extract:
 
         1. consumer_name
         2. consumer_number
@@ -274,6 +274,7 @@ def extract_with_ensemble(
         OCR TEXT:
 
         {markdown_text}
+
         """
 
         # -------------------------------------------------
