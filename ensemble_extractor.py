@@ -40,19 +40,13 @@ def preprocess_image(image_path):
         cv2.COLOR_BGR2GRAY
     )
 
-    # denoise
-
     gray = cv2.fastNlMeansDenoising(gray)
-
-    # blur
 
     gray = cv2.GaussianBlur(
         gray,
         (3, 3),
         0
     )
-
-    # adaptive threshold better for Hindi bills
 
     thresh = cv2.adaptiveThreshold(
         gray,
@@ -95,18 +89,6 @@ def normalize_month(month_text):
         "ऑक्टोबर": "October",
         "नोव्हेंबर": "November",
         "डिसेंबर": "December",
-
-        "jan": "January",
-        "feb": "February",
-        "mar": "March",
-        "apr": "April",
-        "jun": "June",
-        "jul": "July",
-        "aug": "August",
-        "sep": "September",
-        "oct": "October",
-        "nov": "November",
-        "dec": "December",
     }
 
     lower = month_text.lower()
@@ -139,64 +121,18 @@ def clean_month_history(history):
 
     seen = set()
 
-    valid_months = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December"
-    ]
-
-    month_order = {
-        "january": 1,
-        "february": 2,
-        "march": 3,
-        "april": 4,
-        "may": 5,
-        "june": 6,
-        "july": 7,
-        "august": 8,
-        "september": 9,
-        "october": 10,
-        "november": 11,
-        "december": 12
-    }
-
     for item in history:
-
-        # -----------------------------
-        # CLEAN MONTH
-        # -----------------------------
 
         month = normalize_month(
             item.get("month", "")
         )
-
-        month = (
-            str(month)
-            .replace("-", " ")
-            .replace("_", " ")
-            .replace("  ", " ")
-            .strip()
-        )
-
-        # -----------------------------
-        # CLEAN UNITS
-        # -----------------------------
 
         units = str(
             item.get("units", "")
         )
 
         units = re.sub(
-            r"[^\d]",
+            r"\D",
             "",
             units
         )
@@ -211,54 +147,10 @@ def clean_month_history(history):
         except:
             continue
 
-        # realistic electricity range
-
         if units_int < 0 or units_int > 500:
             continue
 
-        # -----------------------------
-        # VALID MONTH CHECK
-        # -----------------------------
-
-        valid = False
-
-        month_name = ""
-
-        for m in valid_months:
-
-            if m.lower() in month.lower():
-
-                valid = True
-                month_name = m
-                break
-
-        if not valid:
-            continue
-
-        # -----------------------------
-        # YEAR EXTRACTION
-        # -----------------------------
-
-        year_match = re.findall(
-            r"20\d{2}",
-            month
-        )
-
-        if year_match:
-
-            year = year_match[0]
-
-        else:
-
-            year = "2025"
-
-        final_month = f"{month_name} {year}"
-
-        # -----------------------------
-        # REMOVE DUPLICATES
-        # -----------------------------
-
-        key = final_month.lower().strip()
+        key = month.lower().strip()
 
         if key in seen:
             continue
@@ -267,37 +159,10 @@ def clean_month_history(history):
 
         cleaned.append({
 
-            "month": final_month,
+            "month": month,
 
             "units": units_int
         })
-
-    # -------------------------------------------------
-    # SORT MONTHS
-    # -------------------------------------------------
-
-    try:
-
-        cleaned.sort(
-            key=lambda x: (
-                int(
-                    re.findall(
-                        r"20\d{2}",
-                        x["month"]
-                    )[0]
-                ),
-                month_order[
-                    x["month"].split()[0].lower()
-                ]
-            )
-        )
-
-    except:
-        pass
-
-    print("\n================ CLEANED MONTH HISTORY ================\n")
-
-    print(cleaned)
 
     return cleaned
 
@@ -374,139 +239,71 @@ def extract_with_ensemble(
             "error": "Groq API Key missing."
         }
 
-    g_client = Groq(api_key=g_key)
-
     try:
 
-        # preprocess
+        print("\n========== USING GROQ ==========\n")
 
         cleaned_image = preprocess_image(
             image_path
         )
 
-        # encode image
-
         base64_image = encode_image(
             cleaned_image
         )
 
-        # -------------------------------------------------
-        # PROMPT
-        # -------------------------------------------------
+        g_client = Groq(api_key=g_key)
 
         parsing_prompt = """
-You are an expert OCR extraction engine for Maharashtra MSEDCL electricity bills.
+Extract exact JSON from Maharashtra MSEDCL electricity bill.
 
-Bills may contain:
-- Hindi
-- Marathi
-- English
+Return ONLY JSON.
 
-Extract ONLY exact values.
+Fields:
 
-IMPORTANT:
-- Return ONLY valid JSON
-- No markdown
-- No explanation
-- Missing values = ""
+consumer_name
+consumer_number
+meter_number
+contract_demand
+fixed_charges
+load_kw
+tariff
+bill_date
+due_date
+bill_amount
+late_amount
+current_reading
+previous_reading
+units
+monthly_history
 
-Extract:
-
-1. consumer_name
-2. consumer_number
-3. meter_number
-4. contract_demand
-5. fixed_charges
-6. load_kw
-7. tariff
-8. bill_date
-9. due_date
-10. bill_amount
-11. late_amount
-12. current_reading
-13. previous_reading
-14. units
-15. monthly_history
-
-MONTH RULES:
-
-These electricity bills contain monthly usage history near graph bars.
-
-Extract ALL visible month + unit pairs carefully.
+Extract all visible month + units correctly.
 
 IMPORTANT:
-- Units are usually between 0 and 500
-- Ignore graph axis labels like 100, 200, 300
-- Ignore bill amounts
-- Ignore meter readings
-- Ignore duplicate OCR numbers
-
-Convert Marathi/Hindi months:
-
-जानेवारी = January
-फेब्रुवारी = February
-मार्च = March
-एप्रिल = April
-मे = May
-जून = June
-जुलै = July
-ऑगस्ट = August
-सप्टेंबर = September
-ऑक्टोबर = October
-नोव्हेंबर = November
-डिसेंबर = December
-
-Return month names EXACTLY like:
-
-February 2025
-March 2025
-April 2025
-
-JSON FORMAT:
-
-{
-    "consumer_name":"",
-    "consumer_number":"",
-    "meter_number":"",
-    "contract_demand":"",
-    "fixed_charges":"",
-    "load_kw":"",
-    "tariff":"",
-    "bill_date":"",
-    "due_date":"",
-    "bill_amount":"",
-    "late_amount":"",
-    "current_reading":"",
-    "previous_reading":"",
-    "units":"",
-    "monthly_history":[
-        {
-            "month":"",
-            "units":""
-        }
-    ]
-}
+- Ignore graph labels like 100 200 300
+- Units are between 0 and 500
+- Extract ALL months carefully
+- Preserve exact values
 """
-
-        # -------------------------------------------------
-        # GROQ REQUEST
-        # -------------------------------------------------
 
         response = g_client.chat.completions.create(
 
             model="meta-llama/llama-4-scout-17b-16e-instruct",
 
             messages=[
+
                 {
                     "role": "user",
 
                     "content": [
+
                         {
                             "type": "text",
                             "text": parsing_prompt
                         },
+
                         {
                             "type": "image_url",
+
                             "image_url": {
                                 "url": f"data:image/jpeg;base64,{base64_image}"
                             }
@@ -527,11 +324,13 @@ JSON FORMAT:
             .content
         )
 
-        print("\n================ JSON OUTPUT ================\n")
+        print("\n========== RAW JSON ==========\n")
 
         print(json_content)
 
-        data = json.loads(json_content)
+        data = json.loads(
+            json_content
+        )
 
         # -------------------------------------------------
         # CLEANUPS
@@ -544,10 +343,6 @@ JSON FORMAT:
         data["load_kw"] = clean_load(
             data.get("load_kw", "")
         )
-
-        data["tariff"] = "90/LT I Res 1-Phase"
-
-        data["contract_demand"] = ""
 
         history = data.get(
             "monthly_history",
@@ -562,10 +357,10 @@ JSON FORMAT:
 
     except Exception as e:
 
-        print("\n================ ERROR ================\n")
+        print("\n========== ERROR ==========\n")
 
         print(str(e))
 
         return {
-            "error": f"Ensemble Error: {str(e)}"
+            "error": str(e)
         }
