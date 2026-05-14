@@ -1,12 +1,12 @@
+# ================================
+# ensemble_extractor.py
+# ================================
+
 import os
-import base64
+import re
 import json
 import cv2
-
-try:
-    from mistralai import Mistral
-except ImportError:
-    from mistralai.client import Mistral
+import base64
 
 from groq import Groq
 from dotenv import load_dotenv
@@ -19,10 +19,9 @@ load_dotenv()
 # -------------------------------------------------
 
 def encode_image(image_path):
-    """
-    Encodes image to base64
-    """
+
     with open(image_path, "rb") as image_file:
+
         return base64.b64encode(
             image_file.read()
         ).decode("utf-8")
@@ -33,32 +32,30 @@ def encode_image(image_path):
 # -------------------------------------------------
 
 def preprocess_image(image_path):
-    """
-    Clean bill image for better OCR
-    """
 
     img = cv2.imread(image_path)
 
-    # grayscale
     gray = cv2.cvtColor(
         img,
         cv2.COLOR_BGR2GRAY
     )
 
-    # denoise
+    gray = cv2.fastNlMeansDenoising(gray)
+
     gray = cv2.GaussianBlur(
         gray,
         (3, 3),
         0
     )
 
-    # threshold
-    thresh = cv2.threshold(
+    thresh = cv2.adaptiveThreshold(
         gray,
-        150,
         255,
-        cv2.THRESH_BINARY
-    )[1]
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        11,
+        2
+    )
 
     cleaned_path = "cleaned_bill.jpg"
 
@@ -71,6 +68,158 @@ def preprocess_image(image_path):
 
 
 # -------------------------------------------------
+# NORMALIZE MONTH
+# -------------------------------------------------
+
+def normalize_month(month_text):
+
+    month_text = str(month_text)
+
+    mapping = {
+
+        "जानेवारी": "January",
+        "फेब्रुवारी": "February",
+        "मार्च": "March",
+        "एप्रिल": "April",
+        "मे": "May",
+        "जून": "June",
+        "जुलै": "July",
+        "ऑगस्ट": "August",
+        "सप्टेंबर": "September",
+        "ऑक्टोबर": "October",
+        "नोव्हेंबर": "November",
+        "डिसेंबर": "December",
+    }
+
+    lower = month_text.lower()
+
+    for k, v in mapping.items():
+
+        if k.lower() in lower:
+
+            year = re.findall(
+                r"20\d{2}",
+                month_text
+            )
+
+            if year:
+
+                return f"{v} {year[0]}"
+
+            return v
+
+    return month_text.strip()
+
+
+# -------------------------------------------------
+# CLEAN MONTH HISTORY
+# -------------------------------------------------
+
+def clean_month_history(history):
+
+    cleaned = []
+
+    seen = set()
+
+    for item in history:
+
+        month = normalize_month(
+            item.get("month", "")
+        )
+
+        units = str(
+            item.get("units", "")
+        )
+
+        units = re.sub(
+            r"\D",
+            "",
+            units
+        )
+
+        if units == "":
+            continue
+
+        try:
+
+            units_int = int(units)
+
+        except:
+            continue
+
+        if units_int < 0 or units_int > 500:
+            continue
+
+        key = month.lower().strip()
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        cleaned.append({
+
+            "month": month,
+
+            "units": units_int
+        })
+
+    return cleaned
+
+
+# -------------------------------------------------
+# CLEAN CONSUMER NUMBER
+# -------------------------------------------------
+
+def clean_consumer_number(number):
+
+    number = re.sub(
+        r"\D",
+        "",
+        str(number)
+    )
+
+    if len(number) == 10:
+
+        number = "43" + number
+
+    elif len(number) == 11:
+
+        if not number.startswith("43"):
+
+            number = "4" + number
+
+    return number
+
+
+# -------------------------------------------------
+# CLEAN LOAD
+# -------------------------------------------------
+
+def clean_load(load_kw):
+
+    load_kw = str(load_kw)
+
+    load_kw = (
+        load_kw
+        .replace("KWKW", "KW")
+        .replace(" ", "")
+        .upper()
+    )
+
+    match = re.search(
+        r"(\d+(\.\d+)?)",
+        load_kw
+    )
+
+    if match:
+
+        return match.group(1)
+
+    return ""
+
+
+# -------------------------------------------------
 # MAIN EXTRACTION
 # -------------------------------------------------
 
@@ -80,90 +229,68 @@ def extract_with_ensemble(
     groq_key=None
 ):
 
-    """
-    Ensemble extraction:
-    1. OpenCV preprocessing
-    2. Mistral OCR
-    3. Llama JSON parsing
-    """
-
-    # -------------------------------------------------
-    # API KEYS
-    # -------------------------------------------------
-
-    m_key = mistral_key or os.environ.get(
-        "MISTRAL_API_KEY"
-    )
-
     g_key = groq_key or os.environ.get(
         "GROQ_API_KEY"
     )
 
-    if not m_key:
-        return {
-            "error": "Mistral API Key missing."
-        }
-
     if not g_key:
+
         return {
             "error": "Groq API Key missing."
         }
 
-    # -------------------------------------------------
-    # CLIENTS
-    # -------------------------------------------------
-
-    m_client = Mistral(api_key=m_key)
-
-    g_client = Groq(api_key=g_key)
-
     try:
 
-        # -------------------------------------------------
-        # STEP 1 : PREPROCESS IMAGE
-        # -------------------------------------------------
+        print("\n========== USING GROQ ==========\n")
 
         cleaned_image = preprocess_image(
             image_path
         )
 
-        # -------------------------------------------------
-        # STEP 2 : ENCODE IMAGE
-        # -------------------------------------------------
-
         base64_image = encode_image(
             cleaned_image
         )
 
-        # -------------------------------------------------
-        # STEP 3 : OCR PROMPT
-        # -------------------------------------------------
+        g_client = Groq(api_key=g_key)
 
-        ocr_prompt = """
-        Perform high-quality OCR on this electricity bill.
+        parsing_prompt = """
+Extract exact JSON from Maharashtra MSEDCL electricity bill.
 
-        Extract:
-        - all text
-        - tables
-        - readings
-        - monthly history
-        - bill amounts
-        - dates
+Return ONLY JSON.
 
-        Maintain structure clearly.
+Fields:
 
-        Return OCR result in Markdown.
-        """
+consumer_name
+consumer_number
+meter_number
+contract_demand
+fixed_charges
+load_kw
+tariff
+bill_date
+due_date
+bill_amount
+late_amount
+current_reading
+previous_reading
+units
+monthly_history
 
-        # -------------------------------------------------
-        # STEP 4 : MISTRAL OCR
-        # -------------------------------------------------
+Extract all visible month + units correctly.
 
-        ocr_response = m_client.chat.complete(
+IMPORTANT:
+- Ignore graph labels like 100 200 300
+- Units are between 0 and 500
+- Extract ALL months carefully
+- Preserve exact values
+"""
 
-            model="mistral-large-latest",
+        response = g_client.chat.completions.create(
+
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
 
             messages=[
+
                 {
                     "role": "user",
 
@@ -171,7 +298,7 @@ def extract_with_ensemble(
 
                         {
                             "type": "text",
-                            "text": ocr_prompt
+                            "text": parsing_prompt
                         },
 
                         {
@@ -206,36 +333,30 @@ def extract_with_ensemble(
         # -------------------------------------------------
 
         parsing_prompt = f"""
-        You are an OCR BILL DATA EXTRACTOR.
+        Extract electricity bill data into STRICT JSON.
 
-        Your ONLY job is to COPY exact visible values from OCR text.
+        IMPORTANT:
+        - Return ONLY valid JSON.
+        - Do NOT return markdown.
+        - Do NOT explain anything.
+        - Missing values should be "".
+        - Units must be numeric only.
+        - Preserve exact bill values.
 
-        STRICT RULES:
+        IMPORTANT FIELD RULES:
 
-        - NEVER guess values
-        - NEVER calculate values
-        - NEVER swap fields
-        - NEVER infer missing data
-        - ONLY copy EXACT text visible in OCR
-        - If value not clearly visible return ""
-        - Preserve numbers exactly as shown
-        - Preserve month names exactly
-        - Preserve reading order exactly
+        - "A50" is NOT meter number.
+        - "A50" is NOT tariff.
+        - Meter number is usually 10-15 digit numeric.
+        - Tariff usually contains LT/Res/Phase.
+        - Units = current_reading - previous_reading.
+        - Load KW may appear as:
+        - Sanctioned Load
+        - Load
+        - Connected Load
+        - Extract monthly history exactly as shown.
 
-        VERY IMPORTANT:
-
-        - "A50" is NOT meter number
-        - "A50" is NOT tariff
-        - Meter number is numeric
-        - Tariff contains LT/Res/Phase
-        - Current reading must be larger than previous reading
-        - Units must equal current - previous
-        - Monthly history must come ONLY from visible table/graph
-        - Do NOT invent monthly history
-        - Do NOT create fake months
-        - Do NOT modify years
-
-        EXTRACT THESE FIELDS EXACTLY:
+        Extract:
 
         1. consumer_name
         2. consumer_number
@@ -250,9 +371,8 @@ def extract_with_ensemble(
         11. current_reading
         12. previous_reading
         13. units
-        14. monthly_history
 
-        RETURN ONLY VALID JSON.
+        Also extract monthly history.
 
         JSON FORMAT:
 
@@ -305,32 +425,49 @@ def extract_with_ensemble(
         )
 
         json_content = (
-            llama_response
+            response
             .choices[0]
             .message
             .content
         )
 
-        # -------------------------------------------------
-        # DEBUG JSON OUTPUT
-        # -------------------------------------------------
-
-        print("\n================ JSON OUTPUT ================\n")
+        print("\n========== RAW JSON ==========\n")
 
         print(json_content)
 
+        data = json.loads(
+            json_content
+        )
+
         # -------------------------------------------------
-        # RETURN JSON
+        # CLEANUPS
         # -------------------------------------------------
 
-        return json.loads(json_content)
+        data["consumer_number"] = clean_consumer_number(
+            data.get("consumer_number", "")
+        )
+
+        data["load_kw"] = clean_load(
+            data.get("load_kw", "")
+        )
+
+        history = data.get(
+            "monthly_history",
+            []
+        )
+
+        data["monthly_history"] = clean_month_history(
+            history
+        )
+
+        return data
 
     except Exception as e:
 
-        print("\n================ ERROR ================\n")
+        print("\n========== ERROR ==========\n")
 
         print(str(e))
 
         return {
-            "error": f"Ensemble Error: {str(e)}"
+            "error": str(e)
         }

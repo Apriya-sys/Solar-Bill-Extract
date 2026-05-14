@@ -1,140 +1,242 @@
+# ================================
+# fill_excel.py
+# ================================
+
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border, Side
 from datetime import datetime
 import os
-import re
 
+
+# -------------------------------------------------
+# SAFE FLOAT
+# -------------------------------------------------
+
+def safe_float(v):
+
+    try:
+
+        return float(
+            str(v)
+            .replace(",", "")
+            .replace("KW", "")
+            .strip()
+        )
+
+    except:
+
+        return 0
+
+
+# -------------------------------------------------
+# NORMALIZE MONTH
+# -------------------------------------------------
+
+def normalize_month(text):
+
+    return (
+        str(text)
+        .replace("-", " ")
+        .replace("_", " ")
+        .replace("  ", " ")
+        .strip()
+        .lower()
+    )
+
+
+# -------------------------------------------------
+# MAIN
+# -------------------------------------------------
 
 def fill_excel_multi(all_data):
 
-    os.makedirs("outputs", exist_ok=True)
+    os.makedirs(
+        "outputs",
+        exist_ok=True
+    )
 
     wb = Workbook()
-    
-    # Remove default sheet
-    default_sheet = wb.active
-    wb.remove(default_sheet)
 
-    for i, data in enumerate(all_data):
-        # Create a new sheet for each bill
-        sheet_name = f"Bill_{i+1}"
-        if data.get("consumer_name"):
-            # Clean sheet name (max 31 chars, no special chars)
-            sheet_name = re.sub(r'[\\*?:/\[\]]', '', data.get("consumer_name"))[:30]
-        
-        ws = wb.create_sheet(title=sheet_name)
+    ws = wb.active
 
-        # -------------------------------------------------
-        # STYLES
-        # -------------------------------------------------
+    ws.title = "Solar_Output"
 
-        bold = Font(bold=True)
+    # -------------------------------------------------
+    # STYLES
+    # -------------------------------------------------
 
-        header_fill = PatternFill(
-            start_color="FFA500",
-            end_color="FFA500",
-            fill_type="solid"
-        )
+    bold = Font(bold=True)
 
-        yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-        green_fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
+    orange = PatternFill(
+        start_color="F4B183",
+        end_color="F4B183",
+        fill_type="solid"
+    )
 
-        thin = Side(style='thin')
-        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    yellow = PatternFill(
+        start_color="FFFF00",
+        end_color="FFFF00",
+        fill_type="solid"
+    )
 
-        # -------------------------------------------------
-        # CUSTOMER DETAILS (Columns B and D)
-        # -------------------------------------------------
+    green = PatternFill(
+        start_color="92D050",
+        end_color="92D050",
+        fill_type="solid"
+    )
 
-        # Row 1: Consumer Name
-        ws["B1"] = "Consumer Name"
-        ws["D1"] = data.get("consumer_name", "")
-        ws["B1"].font = bold
-        ws["B1"].fill = header_fill
-        ws["B1"].border = border
-        ws["D1"].border = border
+    thin = Side(style="thin")
 
-        # Row 2: Consumer No
-        ws["B2"] = "Consumer No"
-        ws["D2"] = str(data.get("consumer_number", ""))
-        ws["B2"].font = bold
-        ws["B2"].fill = header_fill
-        ws["B2"].border = border
-        ws["D2"].border = border
-        ws["D2"].number_format = '@'
+    border = Border(
+        left=thin,
+        right=thin,
+        top=thin,
+        bottom=thin
+    )
 
+    positions = [
+        {"label_col": 2},
+        {"label_col": 8}
+    ]
 
-        # Row 3: Fixed Charges
-        ws["B3"] = "Fixed Charges"
-        ws["D3"] = data.get("fixed_charges", "130")
-        ws["B3"].font = bold
-        ws["B3"].fill = header_fill
-        ws["B3"].border = border
-        ws["D3"].border = border
+    total_capacity = 0
+    total_panels = 0
 
-        # Row 4: Sanct. Load (kW)
-        # Row 4: Sanct. Load (kW)
+    expected_months = [
+        "February 2025",
+        "March 2025",
+        "April 2025",
+        "May 2025",
+        "June 2025",
+        "July 2025",
+        "August 2025",
+        "September 2025",
+        "October 2025",
+        "November 2025",
+        "December 2025",
+        "January 2026"
+    ]
 
-        load_value = data.get("load_kw", "")
+    # -------------------------------------------------
+    # LOOP
+    # -------------------------------------------------
 
-        if not load_value:
-            load_value = "3"
+    for idx, data in enumerate(all_data[:2]):
 
-        ws["B4"] = "Sanct. Load (kW)"
-        ws["D4"] = f"{load_value} KW"
-        ws["B4"].font = bold
-        ws["B4"].fill = header_fill
-        ws["B4"].border = border
-        ws["D4"].border = border
-
-        # Row 5: Connection Type
-        # Row 5: Connection Type
-
-        tariff_value = data.get("tariff", "")
-
-        if tariff_value == "A50" or not tariff_value:
-            tariff_value = "90/LT I Res 1-Phase"
-
-        ws["B5"] = "Connection Type"
-        ws["D5"] = tariff_value
-        ws["B5"].font = bold
-        ws["B5"].fill = header_fill
-        ws["B5"].border = border
-        ws["D5"].border = border
-
-        # Row 6: Contract Demand
-        ws["B6"] = "Contract Demand (KVA) :"
-        ws["B6"].font = bold
-
-        # Row 7: Solar Panel Used
-        ws["B7"] = "Solar Pannel used"
-        ws["C7"] = 600
-        ws["B7"].font = bold
-        ws["B7"].fill = header_fill
-        ws["B7"].border = border
-        ws["C7"].fill = yellow_fill
-        ws["C7"].border = border
+        lc = positions[idx]["label_col"]
 
         # -------------------------------------------------
-        # TABLE HEADER
+        # CLEAN VALUES
         # -------------------------------------------------
 
-        start_row = 9
-        headers = ["Sr.No", "Month", "Units", "Bill Amount", "Unit Cost"]
-        cols = [2, 3, 4, 5, 6] # B, C, D, E, F
+        consumer_no = str(
+            data.get("consumer_number", "")
+        ).replace(" ", "").replace("-", "")
 
-        for col, header in zip(cols, headers):
-            cell = ws.cell(row=start_row, column=col)
+        if len(consumer_no) == 10:
+
+            consumer_no = "43" + consumer_no
+
+        load_kw = str(
+            data.get("load_kw", "")
+        ).replace("KW", "").strip()
+
+        tariff = "90/LT I Res 1-Phase"
+
+        # -------------------------------------------------
+        # DETAILS
+        # -------------------------------------------------
+
+        details = [
+            ("Consumer Name", data.get("consumer_name", "")),
+            ("Consumer No", consumer_no),
+            ("Fixed Charges", data.get("fixed_charges", "130")),
+            ("Sanct. Load (kW)", f"{load_kw}KW"),
+            ("Connection Type", tariff),
+            ("Contract Demand (KVA) :", ""),
+        ]
+
+        row = 2
+
+        for label, value in details:
+
+            ws.cell(row, lc).value = label
+            ws.cell(row, lc + 2).value = value
+
+            ws.cell(row, lc).fill = orange
+            ws.cell(row, lc).font = bold
+
+            ws.cell(row, lc).border = border
+            ws.cell(row, lc + 2).border = border
+
+            row += 1
+
+        # -------------------------------------------------
+        # SOLAR PANEL USED
+        # -------------------------------------------------
+
+        ws.cell(8, lc).value = "Solar Pannel used"
+
+        ws.cell(8, lc + 2).value = 600
+
+        ws.cell(8, lc).fill = orange
+
+        ws.cell(8, lc + 2).fill = yellow
+
+        ws.cell(8, lc).font = bold
+
+        # -------------------------------------------------
+        # HEADERS
+        # -------------------------------------------------
+
+        headers = [
+            "Sr.No",
+            "Month",
+            "Units",
+            "Bill Amount",
+            "Unit Cost"
+        ]
+
+        start_row = 10
+
+        for h_idx, header in enumerate(headers):
+
+            cell = ws.cell(
+                start_row,
+                lc + h_idx
+            )
+
             cell.value = header
+
+            cell.fill = orange
+
             cell.font = bold
-            cell.fill = header_fill
+
             cell.border = border
 
         # -------------------------------------------------
-        # MONTHLY HISTORY DATA
+        # HISTORY
         # -------------------------------------------------
 
-        monthly_history = data.get("monthly_history", [])
+        history = data.get(
+            "monthly_history",
+            []
+        )
+
+        history_map = {}
+
+        for item in history:
+
+            month = normalize_month(
+                item.get("month", "")
+            )
+
+            units = safe_float(
+                item.get("units", 0)
+            )
+
+            history_map[month] = units
+
         total_units = 0
 
         # Mappings for full month names
@@ -153,13 +255,6 @@ def fill_excel_multi(all_data):
             "NOV 2024": "November 2024",
             "DEC 2024": "December 2024",
 
-            "Mar-2024": "March 2024",
-            "Feb-2024": "February 2024",
-            "Jan-2024": "January 2024",
-            "Dec-2023": "December 2023",
-            "Nov-2023": "November 2023",
-            "Oct-2023": "October 2023",
-
             "JAN 2025": "January 2025",
             "FEB 2025": "February 2025",
             "MAR 2025": "March 2025",
@@ -177,56 +272,39 @@ def fill_excel_multi(all_data):
             "FEB 2026": "February 2026",
             "MAR 2026": "March 2026"
         }
+
         for index in range(13): # Show 13 rows like in original
             row_idx = start_row + index + 1
             ws.cell(row=row_idx, column=2).value = index + 2
                     
-            if index < len(monthly_history):
+        if index < len(monthly_history):
 
-                item = monthly_history[index]
+            item = monthly_history[index]
 
-                # Get month safely
-                m_short = str(
-                    item.get("month", "")
-                ).strip()
+            m_short = item.get("month", "")
 
-                # Convert month format
-                month_value = month_map.get(
-                    m_short,
-                    m_short
-                )
+            ws.cell(
+                row=row_idx,
+                column=3
+            ).value = month_map.get(
+                m_short,
+                m_short
+            )
 
-                # Write month to Excel
-                ws.cell(
-                    row=row_idx,
-                    column=3
-                ).value = month_value
+            units_value = item.get("units", 0)
 
-                # Units
-                units_value = item.get(
-                    "units",
-                    0
-                )
+            try:
+                units_value = int(units_value)
 
-                try:
-                    units_value = int(units_value)
+            except:
+                units_value = 0
 
-                except:
-                    units_value = 0
+            ws.cell(
+                row=row_idx,
+                column=4
+            ).value = units_value
 
-                # Write units
-                ws.cell(
-                    row=row_idx,
-                    column=4
-                ).value = units_value
-
-                # Total calculation
-                total_units += units_value
-
-                # DEBUG
-                print(
-                    f"Excel Row => {month_value} : {units_value}"
-                )
+            total_units += units_value
             
             for col in range(2, 7):
                 ws.cell(row=row_idx, column=col).border = border
@@ -235,65 +313,145 @@ def fill_excel_multi(all_data):
         # CALCULATIONS
         # -------------------------------------------------
 
-        calc_row = start_row + 14 # Fixed position for calculations
+        avg_units = round(
+            total_units / 12,
+            2
+        )
 
-        avg_units = total_units / len(monthly_history) if len(monthly_history) > 0 else 0
-        kw = avg_units / 106
-        solar_panels = kw / 0.6
-        solar_capacity = round(solar_panels * 0.7, 1)
-        num_panels = round(solar_capacity / 0.6)
+        kw = round(
+            avg_units / 106,
+            9
+        )
+
+        solar_panels = round(
+            kw / 0.6,
+            9
+        )
+
+        solar_capacity = round(
+            solar_panels * 0.7,
+            1
+        )
+
+        number_panels = round(
+            solar_capacity / 0.6
+        )
+
+        total_capacity += solar_capacity
+
+        total_panels += number_panels
+
+        calc_start = 24
 
         calculations = [
-            ("Average", round(avg_units, 2)),
-            ("kW", round(kw, 2)),
-            ("Solar Panels", round(solar_panels, 2)),
+            ("Average", avg_units),
+            ("kW", kw),
+            ("Solar Panels", solar_panels),
             ("Solar capacity", solar_capacity),
-            ("Number of Panels", num_panels),
+            ("Number of Panels", number_panels),
         ]
 
-        # Formatting colors for bottom rows
-        solar_fill = PatternFill(start_color="FFCC99", end_color="FFCC99", fill_type="solid") # Orange-ish
-
         for label, value in calculations:
-            ws.cell(row=calc_row, column=3).value = label
-            ws.cell(row=calc_row, column=4).value = value
-            ws.cell(row=calc_row, column=3).font = bold
-            ws.cell(row=calc_row, column=3).border = border
-            ws.cell(row=calc_row, column=4).border = border
-            
+
+            ws.cell(
+                calc_start,
+                lc + 1
+            ).value = label
+
+            ws.cell(
+                calc_start,
+                lc + 2
+            ).value = value
+
+            ws.cell(
+                calc_start,
+                lc + 1
+            ).border = border
+
+            ws.cell(
+                calc_start,
+                lc + 2
+            ).border = border
+
+            ws.cell(
+                calc_start,
+                lc + 1
+            ).font = bold
+
             if label == "Solar capacity":
-                ws.cell(row=calc_row, column=3).fill = solar_fill
-                ws.cell(row=calc_row, column=4).fill = yellow_fill
+
+                ws.cell(
+                    calc_start,
+                    lc + 1
+                ).fill = orange
+
+                ws.cell(
+                    calc_start,
+                    lc + 2
+                ).fill = yellow
+
             if label == "Number of Panels":
-                ws.cell(row=calc_row, column=3).fill = green_fill
-                ws.cell(row=calc_row, column=4).fill = green_fill
 
-            calc_row += 1
+                ws.cell(
+                    calc_start,
+                    lc + 1
+                ).fill = green
 
-        # Bottom summary
-        ws.cell(row=calc_row+2, column=3).value = "Total solar capacity"
-        ws.cell(row=calc_row+2, column=4).value = solar_capacity * 2
-        ws.cell(row=calc_row+3, column=3).value = "Number of solar panels"
-        ws.cell(row=calc_row+3, column=4).value = num_panels * 2
+                ws.cell(
+                    calc_start,
+                    lc + 2
+                ).fill = green
 
-        # Column widths
-        ws.column_dimensions["A"].width = 5
-        ws.column_dimensions["B"].width = 25
-        ws.column_dimensions["C"].width = 35
-        ws.column_dimensions["D"].width = 25
-        ws.column_dimensions["E"].width = 15
-        ws.column_dimensions["F"].width = 15
+            calc_start += 1
 
+    # -------------------------------------------------
+    # TOTALS
+    # -------------------------------------------------
+
+    ws["D32"] = "Total solar capacity"
+
+    ws["E32"] = round(
+        total_capacity,
+        1
+    )
+
+    ws["D33"] = "Number of solar panels"
+
+    ws["E33"] = total_panels
+
+    # -------------------------------------------------
+    # WIDTHS
+    # -------------------------------------------------
+
+    widths = {
+        "B":18,
+        "C":28,
+        "D":18,
+        "E":18,
+        "F":18,
+        "H":18,
+        "I":28,
+        "J":18,
+        "K":18,
+        "L":18,
+    }
+
+    for col, width in widths.items():
+
+        ws.column_dimensions[col].width = width
 
     # -------------------------------------------------
     # SAVE
     # -------------------------------------------------
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = f"outputs/all_bills_{timestamp}.xlsx"
+    timestamp = datetime.now().strftime(
+        "%Y%m%d_%H%M%S"
+    )
+
+    output_file = (
+        f"outputs/solar_output_{timestamp}.xlsx"
+    )
 
     wb.save(output_file)
-
-    print(f"\nExcel saved: {output_file}")
 
     return output_file
