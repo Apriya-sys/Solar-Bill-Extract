@@ -153,6 +153,13 @@ def fill_excel_multi(all_data):
             "NOV 2024": "November 2024",
             "DEC 2024": "December 2024",
 
+            "Mar-2024": "March 2024",
+            "Feb-2024": "February 2024",
+            "Jan-2024": "January 2024",
+            "Dec-2023": "December 2023",
+            "Nov-2023": "November 2023",
+            "Oct-2023": "October 2023",
+
             "JAN 2025": "January 2025",
             "FEB 2025": "February 2025",
             "MAR 2025": "March 2025",
@@ -170,39 +177,56 @@ def fill_excel_multi(all_data):
             "FEB 2026": "February 2026",
             "MAR 2026": "March 2026"
         }
-
         for index in range(13): # Show 13 rows like in original
             row_idx = start_row + index + 1
             ws.cell(row=row_idx, column=2).value = index + 2
                     
-        if index < len(monthly_history):
+            if index < len(monthly_history):
 
-            item = monthly_history[index]
+                item = monthly_history[index]
 
-            m_short = item.get("month", "")
+                # Get month safely
+                m_short = str(
+                    item.get("month", "")
+                ).strip()
 
-            ws.cell(
-                row=row_idx,
-                column=3
-            ).value = month_map.get(
-                m_short,
-                m_short
-            )
+                # Convert month format
+                month_value = month_map.get(
+                    m_short,
+                    m_short
+                )
 
-            units_value = item.get("units", 0)
+                # Write month to Excel
+                ws.cell(
+                    row=row_idx,
+                    column=3
+                ).value = month_value
 
-            try:
-                units_value = int(units_value)
+                # Units
+                units_value = item.get(
+                    "units",
+                    0
+                )
 
-            except:
-                units_value = 0
+                try:
+                    units_value = int(units_value)
 
-            ws.cell(
-                row=row_idx,
-                column=4
-            ).value = units_value
+                except:
+                    units_value = 0
 
-            total_units += units_value
+                # Write units
+                ws.cell(
+                    row=row_idx,
+                    column=4
+                ).value = units_value
+
+                # Total calculation
+                total_units += units_value
+
+                # DEBUG
+                print(
+                    f"Excel Row => {month_value} : {units_value}"
+                )
             
             for col in range(2, 7):
                 ws.cell(row=row_idx, column=col).border = border

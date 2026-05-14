@@ -206,30 +206,36 @@ def extract_with_ensemble(
         # -------------------------------------------------
 
         parsing_prompt = f"""
-        Extract electricity bill data into STRICT JSON.
+        You are an OCR BILL DATA EXTRACTOR.
 
-        IMPORTANT:
-        - Return ONLY valid JSON.
-        - Do NOT return markdown.
-        - Do NOT explain anything.
-        - Missing values should be "".
-        - Units must be numeric only.
-        - Preserve exact bill values.
+        Your ONLY job is to COPY exact visible values from OCR text.
 
-        IMPORTANT FIELD RULES:
+        STRICT RULES:
 
-        - "A50" is NOT meter number.
-        - "A50" is NOT tariff.
-        - Meter number is usually 10-15 digit numeric.
-        - Tariff usually contains LT/Res/Phase.
-        - Units = current_reading - previous_reading.
-        - Load KW may appear as:
-        - Sanctioned Load
-        - Load
-        - Connected Load
-        - Extract monthly history exactly as shown.
+        - NEVER guess values
+        - NEVER calculate values
+        - NEVER swap fields
+        - NEVER infer missing data
+        - ONLY copy EXACT text visible in OCR
+        - If value not clearly visible return ""
+        - Preserve numbers exactly as shown
+        - Preserve month names exactly
+        - Preserve reading order exactly
 
-        Extract:
+        VERY IMPORTANT:
+
+        - "A50" is NOT meter number
+        - "A50" is NOT tariff
+        - Meter number is numeric
+        - Tariff contains LT/Res/Phase
+        - Current reading must be larger than previous reading
+        - Units must equal current - previous
+        - Monthly history must come ONLY from visible table/graph
+        - Do NOT invent monthly history
+        - Do NOT create fake months
+        - Do NOT modify years
+
+        EXTRACT THESE FIELDS EXACTLY:
 
         1. consumer_name
         2. consumer_number
@@ -244,8 +250,9 @@ def extract_with_ensemble(
         11. current_reading
         12. previous_reading
         13. units
+        14. monthly_history
 
-        Also extract monthly history.
+        RETURN ONLY VALID JSON.
 
         JSON FORMAT:
 

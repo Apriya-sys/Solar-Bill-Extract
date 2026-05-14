@@ -18,7 +18,18 @@ def extract_bill_data(image_path, mistral_api_key=None, groq_api_key=None):
 
     # 2. Final Processing & Validation
     data = clean_data(data)
-    
+    try:
+
+        prev_read = int(data.get("previous_reading", 0))
+        curr_read = int(data.get("current_reading", 0))
+
+        if prev_read > curr_read:
+
+            data["previous_reading"] = str(curr_read)
+            data["current_reading"] = str(prev_read)
+
+    except:
+        pass
     # Add validation flags
     data["valid_units"] = validate_units(data.get("current_reading"), data.get("previous_reading"), data.get("units"))
     data["valid_amounts"] = validate_amounts(data.get("bill_amount"), data.get("late_amount"))
