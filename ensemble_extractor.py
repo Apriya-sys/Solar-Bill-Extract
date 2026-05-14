@@ -2,6 +2,7 @@ import os
 import re
 import json
 import base64
+import cv2
 
 from groq import Groq
 from mistralai import Mistral
@@ -21,7 +22,7 @@ def encode_image(image_path):
 
 
 # =====================================================
-# VALIDATORS
+# HELPERS
 # =====================================================
 
 def only_digits(text):
@@ -67,15 +68,15 @@ def choose_best(v1, v2):
     v1 = str(v1).strip()
     v2 = str(v2).strip()
 
-    # Prefer longer meaningful value
     if len(v1) > len(v2):
+
         return v1
 
     return v2
 
 
 # =====================================================
-# MONTH HISTORY CLEAN
+# HISTORY CLEAN
 # =====================================================
 
 def clean_history(history):
@@ -97,7 +98,7 @@ def clean_history(history):
         if not month:
             continue
 
-        if not units:
+        if units == "":
             continue
 
         key = month.lower()
@@ -118,7 +119,54 @@ def clean_history(history):
 
 
 # =====================================================
-# PROMPT
+# GRAPH CROP
+# =====================================================
+
+def crop_history_graph(image_path):
+
+    img = cv2.imread(image_path)
+
+    h, w = img.shape[:2]
+
+    x1 = int(w * 0.47)
+    y1 = int(h * 0.34)
+
+    x2 = int(w * 0.78)
+    y2 = int(h * 0.69)
+
+    crop = img[y1:y2, x1:x2]
+
+    gray = cv2.cvtColor(
+        crop,
+        cv2.COLOR_BGR2GRAY
+    )
+
+    gray = cv2.resize(
+        gray,
+        None,
+        fx=3,
+        fy=3
+    )
+
+    thresh = cv2.threshold(
+        gray,
+        0,
+        255,
+        cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )[1]
+
+    graph_path = "history_graph.jpg"
+
+    cv2.imwrite(
+        graph_path,
+        thresh
+    )
+
+    return graph_path
+
+
+# =====================================================
+# MAIN PROMPT
 # =====================================================
 
 PROMPT = """
@@ -142,7 +190,12 @@ IMPORTANT:
 - Readings exact
 - Units exact
 - Load exact
-- Monthly history exact
+
+- Units means electricity consumption only
+- Do NOT return multiplier
+- Do NOT return MF value
+- Units must match:
+  current_reading - previous_reading
 
 Extract:
 
@@ -158,7 +211,6 @@ late_amount
 current_reading
 previous_reading
 units
-monthly_history
 
 JSON FORMAT:
 
@@ -174,7 +226,30 @@ JSON FORMAT:
   "late_amount":"",
   "current_reading":"",
   "previous_reading":"",
-  "units":"",
+  "units":""
+}
+"""
+
+
+# =====================================================
+# GRAPH PROMPT
+# =====================================================
+
+GRAPH_PROMPT = """
+Extract ONLY monthly electricity usage history.
+
+STRICT RULES:
+
+- Return ONLY JSON
+- Ignore axis labels like 100 200 300
+- Ignore QR codes
+- Ignore other text
+- Extract exact month + units
+- If usage is 0 return 0 exactly
+
+JSON FORMAT:
+
+{
   "monthly_history":[
     {
       "month":"",
@@ -183,8 +258,6 @@ JSON FORMAT:
   ]
 }
 """
-
-
 # =====================================================
 # MISTRAL EXTRACTION
 # =====================================================
@@ -209,26 +282,28 @@ def extract_with_mistral(
         messages=[
 
             {
-                "role": "user",
+                "role":"user",
 
-                "content": [
+                "content":[
 
                     {
-                        "type": "text",
-                        "text": PROMPT
+                        "type":"text",
+                        "text":PROMPT
                     },
 
                     {
-                        "type": "image_url",
+                        "type":"image_url",
 
-                        "image_url": f"data:image/jpeg;base64,{base64_image}"
+                        "image_url":{
+                            "url":f"data:image/jpeg;base64,{base64_image}"
+                        }
                     }
                 ]
             }
         ],
 
         response_format={
-            "type": "json_object"
+            "type":"json_object"
         }
     )
 
@@ -266,20 +341,20 @@ def extract_with_llama(
         messages=[
 
             {
-                "role": "user",
+                "role":"user",
 
-                "content": [
+                "content":[
 
                     {
-                        "type": "text",
-                        "text": PROMPT
+                        "type":"text",
+                        "text":PROMPT
                     },
 
                     {
-                        "type": "image_url",
+                        "type":"image_url",
 
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        "image_url":{
+                            "url":f"data:image/jpeg;base64,{base64_image}"
                         }
                     }
                 ]
@@ -287,7 +362,7 @@ def extract_with_llama(
         ],
 
         response_format={
-            "type": "json_object"
+            "type":"json_object"
         }
     )
 
@@ -302,7 +377,71 @@ def extract_with_llama(
 
 
 # =====================================================
-# MERGE LOGIC
+# GRAPH EXTRACTION
+# =====================================================
+
+def extract_graph_history(
+    graph_image,
+    groq_key
+):
+
+    client = Groq(
+        api_key=groq_key
+    )
+
+    base64_image = encode_image(
+        graph_image
+    )
+
+    response = client.chat.completions.create(
+
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
+
+        messages=[
+
+            {
+                "role":"user",
+
+                "content":[
+
+                    {
+                        "type":"text",
+                        "text":GRAPH_PROMPT
+                    },
+
+                    {
+                        "type":"image_url",
+
+                        "image_url":{
+                            "url":f"data:image/jpeg;base64,{base64_image}"
+                        }
+                    }
+                ]
+            }
+        ],
+
+        response_format={
+            "type":"json_object"
+        }
+    )
+
+    content = (
+        response
+        .choices[0]
+        .message
+        .content
+    )
+
+    data = json.loads(content)
+
+    return data.get(
+        "monthly_history",
+        []
+    )
+
+
+# =====================================================
+# MERGE RESULTS
 # =====================================================
 
 def merge_results(
@@ -340,36 +479,35 @@ def merge_results(
             ""
         )
 
-        # Exact match
         if str(m_val).strip() == str(l_val).strip():
 
             final[field] = m_val
 
         else:
 
-            # Prefer better value
             final[field] = choose_best(
                 m_val,
                 l_val
             )
 
-    # Monthly history
-    m_history = mistral_data.get(
-        "monthly_history",
-        []
+    # =====================================================
+    # FIX CONSUMER NUMBER
+    # =====================================================
+
+    consumer = only_digits(
+        final.get("consumer_number", "")
     )
 
-    l_history = llama_data.get(
-        "monthly_history",
-        []
-    )
+    if len(consumer) > 12:
 
-    final["monthly_history"] = clean_history(
-        m_history if len(m_history) >= len(l_history)
-        else l_history
-    )
+        consumer = consumer[:12]
 
-    # Validation
+    final["consumer_number"] = consumer
+
+    # =====================================================
+    # VALIDATION
+    # =====================================================
+
     final["valid_units"] = validate_units(
         final
     )
@@ -423,6 +561,25 @@ def extract_with_ensemble(
         mistral_data,
         llama_data
     )
+
+    # =====================================================
+    # GRAPH EXTRACTION
+    # =====================================================
+
+    graph_image = crop_history_graph(
+        image_path
+    )
+
+    graph_history = extract_graph_history(
+        graph_image,
+        groq_key
+    )
+
+    if graph_history:
+
+        final["monthly_history"] = clean_history(
+            graph_history
+        )
 
     print(
         json.dumps(

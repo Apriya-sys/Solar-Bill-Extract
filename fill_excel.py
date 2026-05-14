@@ -102,21 +102,6 @@ def fill_excel_multi(all_data):
     total_capacity = 0
     total_panels = 0
 
-    expected_months = [
-        "February 2025",
-        "March 2025",
-        "April 2025",
-        "May 2025",
-        "June 2025",
-        "July 2025",
-        "August 2025",
-        "September 2025",
-        "October 2025",
-        "November 2025",
-        "December 2025",
-        "January 2026"
-    ]
-
     # -------------------------------------------------
     # LOOP
     # -------------------------------------------------
@@ -133,15 +118,17 @@ def fill_excel_multi(all_data):
             data.get("consumer_number", "")
         ).replace(" ", "").replace("-", "")
 
-        if len(consumer_no) == 10:
-
-            consumer_no = "43" + consumer_no
+        # Keep max 12 digits
+        consumer_no = consumer_no[:12]
 
         load_kw = str(
             data.get("load_kw", "")
         ).replace("KW", "").strip()
 
-        tariff = "90/LT I Res 1-Phase"
+        tariff = data.get(
+            "tariff",
+            "90/LT I Res 1-Phase"
+        )
 
         # -------------------------------------------------
         # DETAILS
@@ -153,7 +140,7 @@ def fill_excel_multi(all_data):
             ("Fixed Charges", data.get("fixed_charges", "130")),
             ("Sanct. Load (kW)", f"{load_kw}KW"),
             ("Connection Type", tariff),
-            ("Contract Demand (KVA) :", ""),
+            ("Contract Demand (KVA)", ""),
         ]
 
         row = 2
@@ -161,12 +148,15 @@ def fill_excel_multi(all_data):
         for label, value in details:
 
             ws.cell(row, lc).value = label
+
             ws.cell(row, lc + 2).value = value
 
             ws.cell(row, lc).fill = orange
+
             ws.cell(row, lc).font = bold
 
             ws.cell(row, lc).border = border
+
             ws.cell(row, lc + 2).border = border
 
             row += 1
@@ -175,7 +165,7 @@ def fill_excel_multi(all_data):
         # SOLAR PANEL USED
         # -------------------------------------------------
 
-        ws.cell(8, lc).value = "Solar Pannel used"
+        ws.cell(8, lc).value = "Solar Panel used"
 
         ws.cell(8, lc + 2).value = 600
 
@@ -223,23 +213,12 @@ def fill_excel_multi(all_data):
             []
         )
 
-        history_map = {}
-
-        for item in history:
-
-            month = normalize_month(
-                item.get("month", "")
-            )
-
-            units = safe_float(
-                item.get("units", 0)
-            )
-
-            history_map[month] = units
-
         total_units = 0
 
-        # Mappings for full month names
+        # -------------------------------------------------
+        # MONTH MAP
+        # -------------------------------------------------
+
         month_map = {
 
             "JAN 2024": "January 2024",
@@ -273,40 +252,73 @@ def fill_excel_multi(all_data):
             "MAR 2026": "March 2026"
         }
 
-        for index in range(13): # Show 13 rows like in original
+        # -------------------------------------------------
+        # WRITE HISTORY
+        # -------------------------------------------------
+
+        for index in range(13):
+
             row_idx = start_row + index + 1
-            ws.cell(row=row_idx, column=2).value = index + 2
+
+            ws.cell(
+                row=row_idx,
+                column=lc
+            ).value = index + 1
+
+            # SAFE ITEM
             if index < len(history):
 
                 item = history[index]
 
-            m_short = item.get("month", "")
+            else:
+
+                item = {
+                    "month": "",
+                    "units": 0
+                }
+
+            m_short = item.get(
+                "month",
+                ""
+            )
 
             ws.cell(
                 row=row_idx,
-                column=3
+                column=lc + 1
             ).value = month_map.get(
-                m_short,
+                m_short.upper(),
                 m_short
             )
 
-            units_value = item.get("units", 0)
+            units_value = item.get(
+                "units",
+                0
+            )
 
             try:
-                units_value = int(units_value)
+
+                units_value = int(
+                    float(units_value)
+                )
 
             except:
+
                 units_value = 0
 
             ws.cell(
                 row=row_idx,
-                column=4
+                column=lc + 2
             ).value = units_value
 
             total_units += units_value
-            
-            for col in range(2, 7):
-                ws.cell(row=row_idx, column=col).border = border
+
+            # Borders
+            for col in range(lc, lc + 5):
+
+                ws.cell(
+                    row=row_idx,
+                    column=col
+                ).border = border
 
         # -------------------------------------------------
         # CALCULATIONS
