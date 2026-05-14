@@ -3,8 +3,7 @@ pandas
 openpyxl
 Pillow
 opencv-python-headless
-numpy
+numpy==1.26.4
 mistralai==1.5.1
 python-dotenv
 groq
-
