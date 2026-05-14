@@ -86,14 +86,21 @@ def clean_history(history):
 
     for item in history:
 
+        month = str(
+            item.get("month", "")
+        ).strip()
+
         units = only_digits(
             item.get("units", "")
         )
 
-        if units == "":
+        if not month:
             continue
 
-        key = units
+        if units == "":
+            units = "0"
+
+        key = month.lower()
 
         if key in seen:
             continue
@@ -101,6 +108,8 @@ def clean_history(history):
         seen.add(key)
 
         cleaned.append({
+
+            "month": month,
 
             "units": units
         })
@@ -118,17 +127,36 @@ def crop_consumer_number(image_path):
 
     h, w = img.shape[:2]
 
-    x1 = int(w * 0.02)
-    y1 = int(h * 0.06)
+    x1 = int(w * 0.03)
+    y1 = int(h * 0.09)
 
-    x2 = int(w * 0.38)
-    y2 = int(h * 0.18)
+    x2 = int(w * 0.28)
+    y2 = int(h * 0.14)
 
     crop = img[y1:y2, x1:x2]
 
+    gray = cv2.cvtColor(
+        crop,
+        cv2.COLOR_BGR2GRAY
+    )
+
+    gray = cv2.resize(
+        gray,
+        None,
+        fx=4,
+        fy=4
+    )
+
+    thresh = cv2.threshold(
+        gray,
+        0,
+        255,
+        cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )[1]
+
     path = "consumer_crop.jpg"
 
-    cv2.imwrite(path, crop)
+    cv2.imwrite(path, thresh)
 
     return path
 
@@ -279,13 +307,24 @@ Return JSON:
 # =====================================================
 
 GRAPH_PROMPT = """
-Extract ONLY monthly electricity usage units.
+Extract EXACT monthly electricity usage history from graph/table.
+
+STRICT RULES:
+
+- Return ONLY JSON
+- Preserve exact month names
+- Preserve exact unit values
+- Do NOT guess
+- Do NOT reorder months
+- Do NOT skip months
+- If month usage is 0 return 0
 
 Return JSON:
 
 {
   "monthly_history":[
     {
+      "month":"",
       "units":""
     }
   ]
@@ -498,7 +537,7 @@ def merge_results(
 
     if len(consumer) > 12:
 
-        consumer = consumer[:12]
+        consumer = consumer[-12:]
 
     final["consumer_number"] = consumer
 
@@ -600,9 +639,15 @@ def extract_with_ensemble(
 
     if consumer_data.get("consumer_number"):
 
-        final["consumer_number"] = only_digits(
+        consumer = only_digits(
             consumer_data["consumer_number"]
         )
+
+        if len(consumer) > 12:
+
+            consumer = consumer[-12:]
+
+        final["consumer_number"] = consumer
 
     # =====================================================
     # METER NUMBER RECHECK
@@ -637,44 +682,9 @@ def extract_with_ensemble(
         mistral_key
     )
 
-    cleaned = clean_history(
+    final["monthly_history"] = clean_history(
         graph_history
     )
-
-    months = [
-
-        "Jan-2025",
-        "Feb-2025",
-        "Mar-2025",
-        "Apr-2025",
-        "May-2025",
-        "Jun-2025",
-        "Jul-2025",
-        "Aug-2025",
-        "Sep-2025",
-        "Oct-2025",
-        "Nov-2025",
-        "Jan-2026"
-    ]
-
-    fixed_history = []
-
-    for i, item in enumerate(cleaned):
-
-        if i >= len(months):
-            break
-
-        fixed_history.append({
-
-            "month": months[i],
-
-            "units": item.get(
-                "units",
-                ""
-            )
-        })
-
-    final["monthly_history"] = fixed_history
 
     print(
         json.dumps(
