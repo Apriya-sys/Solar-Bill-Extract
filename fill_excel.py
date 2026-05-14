@@ -310,25 +310,27 @@ def fill_excel_multi(all_data):
                 column=lc + 2
             ).value = units_value
 
-            bill_amount = data.get(
-                "bill_amount",
-                ""
-            )
+            if index == 0:
 
-            unit_cost = data.get(
-                "unit_cost",
-                ""
-            )
+                bill_amount = data.get(
+                    "bill_amount",
+                    ""
+                )
 
-            ws.cell(
-                row=row_idx,
-                column=lc + 3
-            ).value = bill_amount
+                unit_cost = data.get(
+                    "unit_cost",
+                    ""
+                )
 
-            ws.cell(
-                row=row_idx,
-                column=lc + 4
-            ).value = unit_cost
+                ws.cell(
+                    row=row_idx,
+                    column=lc + 3
+                ).value = bill_amount
+
+                ws.cell(
+                    row=row_idx,
+                    column=lc + 4
+                ).value = unit_cost
 
             total_units += units_value
 
