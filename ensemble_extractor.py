@@ -1,5 +1,4 @@
 import os
-import re
 import json
 import base64
 import cv2
@@ -76,7 +75,7 @@ def choose_best(v1, v2):
 
 
 # =====================================================
-# HISTORY CLEAN
+# CLEAN HISTORY
 # =====================================================
 
 def clean_history(history):
@@ -87,21 +86,14 @@ def clean_history(history):
 
     for item in history:
 
-        month = str(
-            item.get("month", "")
-        ).strip()
-
         units = only_digits(
             item.get("units", "")
         )
 
-        if not month:
-            continue
-
         if units == "":
             continue
 
-        key = month.lower()
+        key = units
 
         if key in seen:
             continue
@@ -110,12 +102,60 @@ def clean_history(history):
 
         cleaned.append({
 
-            "month": month,
-
             "units": units
         })
 
     return cleaned
+
+
+# =====================================================
+# CONSUMER NUMBER CROP
+# =====================================================
+
+def crop_consumer_number(image_path):
+
+    img = cv2.imread(image_path)
+
+    h, w = img.shape[:2]
+
+    x1 = int(w * 0.02)
+    y1 = int(h * 0.06)
+
+    x2 = int(w * 0.38)
+    y2 = int(h * 0.18)
+
+    crop = img[y1:y2, x1:x2]
+
+    path = "consumer_crop.jpg"
+
+    cv2.imwrite(path, crop)
+
+    return path
+
+
+# =====================================================
+# METER NUMBER CROP
+# =====================================================
+
+def crop_meter_number(image_path):
+
+    img = cv2.imread(image_path)
+
+    h, w = img.shape[:2]
+
+    x1 = int(w * 0.05)
+    y1 = int(h * 0.24)
+
+    x2 = int(w * 0.42)
+    y2 = int(h * 0.42)
+
+    crop = img[y1:y2, x1:x2]
+
+    path = "meter_crop.jpg"
+
+    cv2.imwrite(path, crop)
+
+    return path
 
 
 # =====================================================
@@ -175,49 +215,9 @@ Extract EXACT data from this Maharashtra MSEDCL electricity bill.
 STRICT RULES:
 
 - Return ONLY valid JSON
-- Do NOT explain
-- Do NOT calculate
-- Do NOT modify values
-- Do NOT guess missing values
-- Preserve exact bill values
-
-IMPORTANT:
-
-- Consumer number must be exact
-- Meter number must be exact
-- Bill amount exact
-- Late amount exact
-- Readings exact
-- Units exact
-- Load exact
-
-- Units means electricity consumption only
-- Do NOT return multiplier
-- Do NOT return MF value
-- Units must match:
-  current_reading - previous_reading
-
-Extract:
-
-consumer_name
-consumer_number
-meter_number
-load_kw
-tariff
-bill_date
-due_date
-bill_amount
-late_amount
-current_reading
-previous_reading
-units
-
-fixed_charges
-energy_charges
-electricity_duty
-wheeling_charges
-fuel_adjustment
-unit_cost
+- Preserve exact values
+- Do NOT guess
+- Do NOT rearrange digits
 
 JSON FORMAT:
 
@@ -234,7 +234,6 @@ JSON FORMAT:
   "current_reading":"",
   "previous_reading":"",
   "units":"",
-
   "fixed_charges":"",
   "energy_charges":"",
   "electricity_duty":"",
@@ -246,27 +245,47 @@ JSON FORMAT:
 
 
 # =====================================================
+# CONSUMER PROMPT
+# =====================================================
+
+CONSUMER_PROMPT = """
+Extract ONLY consumer number.
+
+Return JSON:
+
+{
+  "consumer_number":""
+}
+"""
+
+
+# =====================================================
+# METER PROMPT
+# =====================================================
+
+METER_PROMPT = """
+Extract ONLY meter number.
+
+Return JSON:
+
+{
+  "meter_number":""
+}
+"""
+
+
+# =====================================================
 # GRAPH PROMPT
 # =====================================================
 
 GRAPH_PROMPT = """
-Extract ONLY monthly electricity usage history.
+Extract ONLY monthly electricity usage units.
 
-STRICT RULES:
-
-- Return ONLY JSON
-- Ignore axis labels like 100 200 300
-- Ignore QR codes
-- Ignore other text
-- Extract exact month + units
-- If usage is 0 return 0 exactly
-
-JSON FORMAT:
+Return JSON:
 
 {
   "monthly_history":[
     {
-      "month":"",
       "units":""
     }
   ]
@@ -275,11 +294,12 @@ JSON FORMAT:
 
 
 # =====================================================
-# MISTRAL EXTRACTION
+# GENERIC MISTRAL EXTRACTOR
 # =====================================================
 
-def extract_with_mistral(
+def mistral_extract(
     image_path,
+    prompt,
     mistral_key
 ):
 
@@ -304,7 +324,7 @@ def extract_with_mistral(
 
                     {
                         "type":"text",
-                        "text":PROMPT
+                        "text":prompt
                     },
 
                     {
@@ -398,57 +418,14 @@ def extract_with_llama(
 
 def extract_graph_history(
     graph_image,
-    groq_key
+    mistral_key
 ):
 
-    client = Groq(
-        api_key=groq_key
+    data = mistral_extract(
+        graph_image,
+        GRAPH_PROMPT,
+        mistral_key
     )
-
-    base64_image = encode_image(
-        graph_image
-    )
-
-    response = client.chat.completions.create(
-
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
-
-        messages=[
-
-            {
-                "role":"user",
-
-                "content":[
-
-                    {
-                        "type":"text",
-                        "text":GRAPH_PROMPT
-                    },
-
-                    {
-                        "type":"image_url",
-
-                        "image_url":{
-                            "url":f"data:image/jpeg;base64,{base64_image}"
-                        }
-                    }
-                ]
-            }
-        ],
-
-        response_format={
-            "type":"json_object"
-        }
-    )
-
-    content = (
-        response
-        .choices[0]
-        .message
-        .content
-    )
-
-    data = json.loads(content)
 
     return data.get(
         "monthly_history",
@@ -513,9 +490,7 @@ def merge_results(
                 l_val
             )
 
-    # =====================================================
     # FIX CONSUMER NUMBER
-    # =====================================================
 
     consumer = only_digits(
         final.get("consumer_number", "")
@@ -527,9 +502,15 @@ def merge_results(
 
     final["consumer_number"] = consumer
 
-    # =====================================================
-    # AUTO CALCULATE UNIT COST
-    # =====================================================
+    # FIX METER NUMBER
+
+    meter = only_digits(
+        final.get("meter_number", "")
+    )
+
+    final["meter_number"] = meter
+
+    # UNIT COST
 
     try:
 
@@ -552,10 +533,6 @@ def merge_results(
 
         final["unit_cost"] = 0
 
-    # =====================================================
-    # VALIDATION
-    # =====================================================
-
     final["valid_units"] = validate_units(
         final
     )
@@ -573,22 +550,22 @@ def extract_with_ensemble(
     groq_key=None
 ):
 
-    print("\n========== MISTRAL EXTRACTION ==========\n")
+    print("\n========== MISTRAL ==========\n")
 
-    mistral_data = extract_with_mistral(
+    mistral_data = mistral_extract(
         image_path,
+        PROMPT,
         mistral_key
     )
 
     print(
         json.dumps(
             mistral_data,
-            indent=2,
-            ensure_ascii=False
+            indent=2
         )
     )
 
-    print("\n========== LLAMA EXTRACTION ==========\n")
+    print("\n========== LLAMA ==========\n")
 
     llama_data = extract_with_llama(
         image_path,
@@ -598,17 +575,54 @@ def extract_with_ensemble(
     print(
         json.dumps(
             llama_data,
-            indent=2,
-            ensure_ascii=False
+            indent=2
         )
     )
-
-    print("\n========== MERGING ==========\n")
 
     final = merge_results(
         mistral_data,
         llama_data
     )
+
+    # =====================================================
+    # CONSUMER NUMBER RECHECK
+    # =====================================================
+
+    consumer_crop = crop_consumer_number(
+        image_path
+    )
+
+    consumer_data = mistral_extract(
+        consumer_crop,
+        CONSUMER_PROMPT,
+        mistral_key
+    )
+
+    if consumer_data.get("consumer_number"):
+
+        final["consumer_number"] = only_digits(
+            consumer_data["consumer_number"]
+        )
+
+    # =====================================================
+    # METER NUMBER RECHECK
+    # =====================================================
+
+    meter_crop = crop_meter_number(
+        image_path
+    )
+
+    meter_data = mistral_extract(
+        meter_crop,
+        METER_PROMPT,
+        mistral_key
+    )
+
+    if meter_data.get("meter_number"):
+
+        final["meter_number"] = only_digits(
+            meter_data["meter_number"]
+        )
 
     # =====================================================
     # GRAPH EXTRACTION
@@ -620,14 +634,47 @@ def extract_with_ensemble(
 
     graph_history = extract_graph_history(
         graph_image,
-        groq_key
+        mistral_key
     )
 
-    if graph_history:
+    cleaned = clean_history(
+        graph_history
+    )
 
-        final["monthly_history"] = clean_history(
-            graph_history
-        )
+    months = [
+
+        "Jan-2025",
+        "Feb-2025",
+        "Mar-2025",
+        "Apr-2025",
+        "May-2025",
+        "Jun-2025",
+        "Jul-2025",
+        "Aug-2025",
+        "Sep-2025",
+        "Oct-2025",
+        "Nov-2025",
+        "Jan-2026"
+    ]
+
+    fixed_history = []
+
+    for i, item in enumerate(cleaned):
+
+        if i >= len(months):
+            break
+
+        fixed_history.append({
+
+            "month": months[i],
+
+            "units": item.get(
+                "units",
+                ""
+            )
+        })
+
+    final["monthly_history"] = fixed_history
 
     print(
         json.dumps(
