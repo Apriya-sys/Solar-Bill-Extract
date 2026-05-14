@@ -17,7 +17,7 @@ def extract_bill_data(image_path, mistral_api_key=None, groq_api_key=None):
         return data
 
     # 2. Final Processing & Validation
-    data = clean_data(data)
+   # No aggressive cleanup
     try:
 
         prev_read = int(data.get("previous_reading", 0))

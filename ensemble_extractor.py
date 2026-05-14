@@ -1,121 +1,84 @@
-# ================================
-# ensemble_extractor.py
-# ================================
-
 import os
 import re
 import json
-import cv2
 import base64
 
 from groq import Groq
-from dotenv import load_dotenv
-
-load_dotenv()
+from mistralai import Mistral
 
 
-# -------------------------------------------------
+# =====================================================
 # IMAGE ENCODER
-# -------------------------------------------------
+# =====================================================
 
 def encode_image(image_path):
 
-    with open(image_path, "rb") as image_file:
+    with open(image_path, "rb") as f:
 
         return base64.b64encode(
-            image_file.read()
+            f.read()
         ).decode("utf-8")
 
 
-# -------------------------------------------------
-# IMAGE PREPROCESSING
-# -------------------------------------------------
+# =====================================================
+# VALIDATORS
+# =====================================================
 
-def preprocess_image(image_path):
+def only_digits(text):
 
-    img = cv2.imread(image_path)
-
-    gray = cv2.cvtColor(
-        img,
-        cv2.COLOR_BGR2GRAY
+    return "".join(
+        filter(str.isdigit, str(text))
     )
 
-    gray = cv2.fastNlMeansDenoising(gray)
 
-    gray = cv2.GaussianBlur(
-        gray,
-        (3, 3),
-        0
-    )
+def validate_units(data):
 
-    thresh = cv2.adaptiveThreshold(
-        gray,
-        255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,
-        11,
-        2
-    )
+    try:
 
-    cleaned_path = "cleaned_bill.jpg"
-
-    cv2.imwrite(
-        cleaned_path,
-        thresh
-    )
-
-    return cleaned_path
-
-
-# -------------------------------------------------
-# NORMALIZE MONTH
-# -------------------------------------------------
-
-def normalize_month(month_text):
-
-    month_text = str(month_text)
-
-    mapping = {
-
-        "जानेवारी": "January",
-        "फेब्रुवारी": "February",
-        "मार्च": "March",
-        "एप्रिल": "April",
-        "मे": "May",
-        "जून": "June",
-        "जुलै": "July",
-        "ऑगस्ट": "August",
-        "सप्टेंबर": "September",
-        "ऑक्टोबर": "October",
-        "नोव्हेंबर": "November",
-        "डिसेंबर": "December",
-    }
-
-    lower = month_text.lower()
-
-    for k, v in mapping.items():
-
-        if k.lower() in lower:
-
-            year = re.findall(
-                r"20\d{2}",
-                month_text
+        curr = int(
+            only_digits(
+                data.get("current_reading", "")
             )
+        )
 
-            if year:
+        prev = int(
+            only_digits(
+                data.get("previous_reading", "")
+            )
+        )
 
-                return f"{v} {year[0]}"
+        units = int(
+            only_digits(
+                data.get("units", "")
+            )
+        )
 
-            return v
+        diff = curr - prev
 
-    return month_text.strip()
+        return abs(diff - units) <= 2
+
+    except:
+
+        return False
 
 
-# -------------------------------------------------
-# CLEAN MONTH HISTORY
-# -------------------------------------------------
+def choose_best(v1, v2):
 
-def clean_month_history(history):
+    v1 = str(v1).strip()
+    v2 = str(v2).strip()
+
+    # Prefer longer meaningful value
+    if len(v1) > len(v2):
+        return v1
+
+    return v2
+
+
+# =====================================================
+# MONTH HISTORY CLEAN
+# =====================================================
+
+def clean_history(history):
 
     cleaned = []
 
@@ -123,34 +86,21 @@ def clean_month_history(history):
 
     for item in history:
 
-        month = normalize_month(
+        month = str(
             item.get("month", "")
-        )
+        ).strip()
 
-        units = str(
+        units = only_digits(
             item.get("units", "")
         )
 
-        units = re.sub(
-            r"\D",
-            "",
-            units
-        )
-
-        if units == "":
+        if not month:
             continue
 
-        try:
-
-            units_int = int(units)
-
-        except:
+        if not units:
             continue
 
-        if units_int < 0 or units_int > 500:
-            continue
-
-        key = month.lower().strip()
+        key = month.lower()
 
         if key in seen:
             continue
@@ -161,110 +111,44 @@ def clean_month_history(history):
 
             "month": month,
 
-            "units": units_int
+            "units": units
         })
 
     return cleaned
 
 
-# -------------------------------------------------
-# CLEAN CONSUMER NUMBER
-# -------------------------------------------------
+# =====================================================
+# PROMPT
+# =====================================================
 
-def clean_consumer_number(number):
+PROMPT = """
+Extract EXACT data from this Maharashtra MSEDCL electricity bill.
 
-    number = re.sub(
-        r"\D",
-        "",
-        str(number)
-    )
+STRICT RULES:
 
-    if len(number) == 10:
+- Return ONLY valid JSON
+- Do NOT explain
+- Do NOT calculate
+- Do NOT modify values
+- Do NOT guess missing values
+- Preserve exact bill values
 
-        number = "43" + number
+IMPORTANT:
 
-    elif len(number) == 11:
+- Consumer number must be exact
+- Meter number must be exact
+- Bill amount exact
+- Late amount exact
+- Readings exact
+- Units exact
+- Load exact
+- Monthly history exact
 
-        if not number.startswith("43"):
-
-            number = "4" + number
-
-    return number
-
-
-# -------------------------------------------------
-# CLEAN LOAD
-# -------------------------------------------------
-
-def clean_load(load_kw):
-
-    load_kw = str(load_kw)
-
-    load_kw = (
-        load_kw
-        .replace("KWKW", "KW")
-        .replace(" ", "")
-        .upper()
-    )
-
-    match = re.search(
-        r"(\d+(\.\d+)?)",
-        load_kw
-    )
-
-    if match:
-
-        return match.group(1)
-
-    return ""
-
-
-# -------------------------------------------------
-# MAIN EXTRACTION
-# -------------------------------------------------
-
-def extract_with_ensemble(
-    image_path,
-    mistral_key=None,
-    groq_key=None
-):
-
-    g_key = groq_key or os.environ.get(
-        "GROQ_API_KEY"
-    )
-
-    if not g_key:
-
-        return {
-            "error": "Groq API Key missing."
-        }
-
-    try:
-
-        print("\n========== USING GROQ ==========\n")
-
-        cleaned_image = preprocess_image(
-            image_path
-        )
-
-        base64_image = encode_image(
-            cleaned_image
-        )
-
-        g_client = Groq(api_key=g_key)
-
-        parsing_prompt = """
-Extract exact JSON from Maharashtra MSEDCL electricity bill.
-
-Return ONLY JSON.
-
-Fields:
+Extract:
 
 consumer_name
 consumer_number
 meter_number
-contract_demand
-fixed_charges
 load_kw
 tariff
 bill_date
@@ -276,198 +160,276 @@ previous_reading
 units
 monthly_history
 
-Extract all visible month + units correctly.
+JSON FORMAT:
 
-IMPORTANT:
-- Ignore graph labels like 100 200 300
-- Units are between 0 and 500
-- Extract ALL months carefully
-- Preserve exact values
+{
+  "consumer_name":"",
+  "consumer_number":"",
+  "meter_number":"",
+  "load_kw":"",
+  "tariff":"",
+  "bill_date":"",
+  "due_date":"",
+  "bill_amount":"",
+  "late_amount":"",
+  "current_reading":"",
+  "previous_reading":"",
+  "units":"",
+  "monthly_history":[
+    {
+      "month":"",
+      "units":""
+    }
+  ]
+}
 """
 
-        response = g_client.chat.completions.create(
 
-            model="meta-llama/llama-4-scout-17b-16e-instruct",
+# =====================================================
+# MISTRAL EXTRACTION
+# =====================================================
 
-            messages=[
+def extract_with_mistral(
+    image_path,
+    mistral_key
+):
 
-                {
-                    "role": "user",
+    client = Mistral(
+        api_key=mistral_key
+    )
 
-                    "content": [
+    base64_image = encode_image(
+        image_path
+    )
 
-                        {
-                            "type": "text",
-                            "text": parsing_prompt
-                        },
+    response = client.chat.complete(
 
-                        {
-                            "type": "image_url",
+        model="pixtral-12b-2409",
 
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            }
-                        }
-                    ]
-                }
-            ]
-        )
+        messages=[
 
-        markdown_text = (
-            ocr_response
-            .choices[0]
-            .message
-            .content
-        )
+            {
+                "role": "user",
 
-        # -------------------------------------------------
-        # DEBUG OCR OUTPUT
-        # -------------------------------------------------
+                "content": [
 
-        print("\n================ OCR OUTPUT ================\n")
+                    {
+                        "type": "text",
+                        "text": PROMPT
+                    },
 
-        print(markdown_text)
+                    {
+                        "type": "image_url",
 
-        # -------------------------------------------------
-        # STEP 5 : JSON EXTRACTION PROMPT
-        # -------------------------------------------------
-
-        parsing_prompt = f"""
-        Extract electricity bill data into STRICT JSON.
-
-        IMPORTANT:
-        - Return ONLY valid JSON.
-        - Do NOT return markdown.
-        - Do NOT explain anything.
-        - Missing values should be "".
-        - Units must be numeric only.
-        - Preserve exact bill values.
-
-        IMPORTANT FIELD RULES:
-
-        - "A50" is NOT meter number.
-        - "A50" is NOT tariff.
-        - Meter number is usually 10-15 digit numeric.
-        - Tariff usually contains LT/Res/Phase.
-        - Units = current_reading - previous_reading.
-        - Load KW may appear as:
-        - Sanctioned Load
-        - Load
-        - Connected Load
-        - Extract monthly history exactly as shown.
-
-        Extract:
-
-        1. consumer_name
-        2. consumer_number
-        3. meter_number
-        4. fixed_charges
-        5. load_kw
-        6. tariff
-        7. bill_date
-        8. due_date
-        9. bill_amount
-        10. late_amount
-        11. current_reading
-        12. previous_reading
-        13. units
-
-        Also extract monthly history.
-
-        JSON FORMAT:
-
-        {{
-            "consumer_name":"",
-            "consumer_number":"",
-            "meter_number":"",
-            "fixed_charges":"",
-            "load_kw":"",
-            "tariff":"",
-            "bill_date":"",
-            "due_date":"",
-            "bill_amount":"",
-            "late_amount":"",
-            "current_reading":"",
-            "previous_reading":"",
-            "units":"",
-            "monthly_history":[
-                {{
-                    "month":"",
-                    "units":""
-                }}
-            ]
-        }}
-
-        OCR TEXT:
-
-        {markdown_text}
-
-        """
-
-        # -------------------------------------------------
-        # STEP 6 : LLAMA PARSING
-        # -------------------------------------------------
-
-        llama_response = g_client.chat.completions.create(
-
-            model="llama-3.3-70b-versatile",
-
-            messages=[
-                {
-                    "role": "user",
-                    "content": parsing_prompt
-                }
-            ],
-
-            response_format={
-                "type": "json_object"
+                        "image_url": f"data:image/jpeg;base64,{base64_image}"
+                    }
+                ]
             }
-        )
+        ],
 
-        json_content = (
-            response
-            .choices[0]
-            .message
-            .content
-        )
-
-        print("\n========== RAW JSON ==========\n")
-
-        print(json_content)
-
-        data = json.loads(
-            json_content
-        )
-
-        # -------------------------------------------------
-        # CLEANUPS
-        # -------------------------------------------------
-
-        data["consumer_number"] = clean_consumer_number(
-            data.get("consumer_number", "")
-        )
-
-        data["load_kw"] = clean_load(
-            data.get("load_kw", "")
-        )
-
-        history = data.get(
-            "monthly_history",
-            []
-        )
-
-        data["monthly_history"] = clean_month_history(
-            history
-        )
-
-        return data
-
-    except Exception as e:
-
-        print("\n========== ERROR ==========\n")
-
-        print(str(e))
-
-        return {
-            "error": str(e)
+        response_format={
+            "type": "json_object"
         }
+    )
+
+    content = (
+        response
+        .choices[0]
+        .message
+        .content
+    )
+
+    return json.loads(content)
+
+
+# =====================================================
+# LLAMA EXTRACTION
+# =====================================================
+
+def extract_with_llama(
+    image_path,
+    groq_key
+):
+
+    client = Groq(
+        api_key=groq_key
+    )
+
+    base64_image = encode_image(
+        image_path
+    )
+
+    response = client.chat.completions.create(
+
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
+
+        messages=[
+
+            {
+                "role": "user",
+
+                "content": [
+
+                    {
+                        "type": "text",
+                        "text": PROMPT
+                    },
+
+                    {
+                        "type": "image_url",
+
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        }
+                    }
+                ]
+            }
+        ],
+
+        response_format={
+            "type": "json_object"
+        }
+    )
+
+    content = (
+        response
+        .choices[0]
+        .message
+        .content
+    )
+
+    return json.loads(content)
+
+
+# =====================================================
+# MERGE LOGIC
+# =====================================================
+
+def merge_results(
+    mistral_data,
+    llama_data
+):
+
+    final = {}
+
+    fields = [
+
+        "consumer_name",
+        "consumer_number",
+        "meter_number",
+        "load_kw",
+        "tariff",
+        "bill_date",
+        "due_date",
+        "bill_amount",
+        "late_amount",
+        "current_reading",
+        "previous_reading",
+        "units"
+    ]
+
+    for field in fields:
+
+        m_val = mistral_data.get(
+            field,
+            ""
+        )
+
+        l_val = llama_data.get(
+            field,
+            ""
+        )
+
+        # Exact match
+        if str(m_val).strip() == str(l_val).strip():
+
+            final[field] = m_val
+
+        else:
+
+            # Prefer better value
+            final[field] = choose_best(
+                m_val,
+                l_val
+            )
+
+    # Monthly history
+    m_history = mistral_data.get(
+        "monthly_history",
+        []
+    )
+
+    l_history = llama_data.get(
+        "monthly_history",
+        []
+    )
+
+    final["monthly_history"] = clean_history(
+        m_history if len(m_history) >= len(l_history)
+        else l_history
+    )
+
+    # Validation
+    final["valid_units"] = validate_units(
+        final
+    )
+
+    return final
+
+
+# =====================================================
+# MAIN FUNCTION
+# =====================================================
+
+def extract_with_ensemble(
+    image_path,
+    mistral_key=None,
+    groq_key=None
+):
+
+    print("\n========== MISTRAL EXTRACTION ==========\n")
+
+    mistral_data = extract_with_mistral(
+        image_path,
+        mistral_key
+    )
+
+    print(
+        json.dumps(
+            mistral_data,
+            indent=2,
+            ensure_ascii=False
+        )
+    )
+
+    print("\n========== LLAMA EXTRACTION ==========\n")
+
+    llama_data = extract_with_llama(
+        image_path,
+        groq_key
+    )
+
+    print(
+        json.dumps(
+            llama_data,
+            indent=2,
+            ensure_ascii=False
+        )
+    )
+
+    print("\n========== MERGING ==========\n")
+
+    final = merge_results(
+        mistral_data,
+        llama_data
+    )
+
+    print(
+        json.dumps(
+            final,
+            indent=2,
+            ensure_ascii=False
+        )
+    )
+
+    return final
