@@ -276,10 +276,9 @@ def fill_excel_multi(all_data):
         for index in range(13): # Show 13 rows like in original
             row_idx = start_row + index + 1
             ws.cell(row=row_idx, column=2).value = index + 2
-                    
-        if index < len(monthly_history):
+            if index < len(history):
 
-            item = monthly_history[index]
+                item = history[index]
 
             m_short = item.get("month", "")
 

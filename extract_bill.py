@@ -1,68 +1,88 @@
 import os
+
 from ensemble_extractor import extract_with_ensemble
 
-from validations import clean_data, validate_units, validate_amounts, validate_consumer_number
+from validations import (
+    validate_units,
+    validate_amounts,
+    validate_consumer_number
+)
 
-def extract_bill_data(image_path, mistral_api_key=None, groq_api_key=None):
+
+def extract_bill_data(
+    image_path,
+    mistral_api_key=None,
+    groq_api_key=None
+):
     """
-    Orchestrates the bill extraction using the Mistral + Llama Ensemble method.
-    Bypasses legacy regional OCR for maximum accuracy.
+    Orchestrates bill extraction using:
+
+    1. Mistral Vision
+    2. Llama Vision
+    3. Compare + Merge
+
+    Returns exact extracted bill values.
     """
-    print(f"--- Starting Ensemble AI Extraction for {image_path} ---")
-    
-    # 1. AI Ensemble Extraction
-    data = extract_with_ensemble(image_path, mistral_key=mistral_api_key, groq_key=groq_api_key)
-    
+
+    print(
+        f"--- Starting Ensemble AI Extraction for {image_path} ---"
+    )
+
+    # =====================================================
+    # ENSEMBLE EXTRACTION
+    # =====================================================
+
+    data = extract_with_ensemble(
+        image_path,
+        mistral_key=mistral_api_key,
+        groq_key=groq_api_key
+    )
+
+    # =====================================================
+    # ERROR CHECK
+    # =====================================================
+
     if "error" in data:
+
         return data
 
-    # 2. Final Processing & Validation
-   # No aggressive cleanup
-    try:
+    # =====================================================
+    # VALIDATIONS ONLY
+    # =====================================================
 
-        prev_read = int(data.get("previous_reading", 0))
-        curr_read = int(data.get("current_reading", 0))
-
-        if prev_read > curr_read:
-
-            data["previous_reading"] = str(curr_read)
-            data["current_reading"] = str(prev_read)
-
-    except:
-        pass
-    # Add validation flags
-    data["valid_units"] = validate_units(data.get("current_reading"), data.get("previous_reading"), data.get("units"))
-    data["valid_amounts"] = validate_amounts(data.get("bill_amount"), data.get("late_amount"))
-    # Fix consumer number length
-
-    consumer_no = str(
-        data.get("consumer_number", "")
+    data["valid_units"] = validate_units(
+        data.get("current_reading"),
+        data.get("previous_reading"),
+        data.get("units")
     )
 
-    # Keep only digits
-    consumer_no = "".join(
-        filter(str.isdigit, consumer_no)
+    data["valid_amounts"] = validate_amounts(
+        data.get("bill_amount"),
+        data.get("late_amount")
     )
 
-    # Maharashtra bills usually 11 digits
-    if len(consumer_no) > 11:
-        consumer_no = consumer_no[-11:]
-
-    data["consumer_number"] = consumer_no
     data["valid_consumer"] = validate_consumer_number(
-    data.get("consumer_number")
-)
-    
-    # Default fallback for fixed charges if missing
-    if not data.get("fixed_charges"):
-        data["fixed_charges"] = "130"
-    
-    # ── PRINT RESULT ──────────────────────────────────────
-    print("\n========== ENSEMBLE EXTRACTED DATA ==========\n")
+        data.get("consumer_number")
+    )
+
+    # =====================================================
+    # PRINT RESULT
+    # =====================================================
+
+    print("\n========== FINAL EXTRACTED DATA ==========\n")
+
     for k, v in data.items():
+
         if k != "monthly_history":
+
             print(f"{k}: {v}")
-    print(f"monthly_history: {len(data.get('monthly_history', []))} items")
-    print("────────────────────────────────────────────\n")
-    
+
+    print(
+        f"monthly_history: {len(data.get('monthly_history', []))} items"
+    )
+
+    print(
+        "────────────────────────────────────────────\n"
+    )
+
     return data
