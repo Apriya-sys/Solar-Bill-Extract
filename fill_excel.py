@@ -6,6 +6,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border, Side
 from datetime import datetime
 import os
+import math
 
 
 # -------------------------------------------------
@@ -26,22 +27,6 @@ def safe_float(v):
     except:
 
         return 0
-
-
-# -------------------------------------------------
-# NORMALIZE MONTH
-# -------------------------------------------------
-
-def normalize_month(text):
-
-    return (
-        str(text)
-        .replace("-", " ")
-        .replace("_", " ")
-        .replace("  ", " ")
-        .strip()
-        .lower()
-    )
 
 
 # -------------------------------------------------
@@ -118,7 +103,6 @@ def fill_excel_multi(all_data):
             data.get("consumer_number", "")
         ).replace(" ", "").replace("-", "")
 
-        # Keep max 12 digits
         consumer_no = consumer_no[:12]
 
         load_kw = str(
@@ -148,15 +132,12 @@ def fill_excel_multi(all_data):
         for label, value in details:
 
             ws.cell(row, lc).value = label
-
             ws.cell(row, lc + 2).value = value
 
             ws.cell(row, lc).fill = orange
-
             ws.cell(row, lc).font = bold
 
             ws.cell(row, lc).border = border
-
             ws.cell(row, lc + 2).border = border
 
             row += 1
@@ -170,10 +151,12 @@ def fill_excel_multi(all_data):
         ws.cell(8, lc + 2).value = 600
 
         ws.cell(8, lc).fill = orange
-
         ws.cell(8, lc + 2).fill = yellow
 
         ws.cell(8, lc).font = bold
+
+        ws.cell(8, lc).border = border
+        ws.cell(8, lc + 2).border = border
 
         # -------------------------------------------------
         # HEADERS
@@ -199,9 +182,7 @@ def fill_excel_multi(all_data):
             cell.value = header
 
             cell.fill = orange
-
             cell.font = bold
-
             cell.border = border
 
         # -------------------------------------------------
@@ -216,43 +197,6 @@ def fill_excel_multi(all_data):
         total_units = 0
 
         # -------------------------------------------------
-        # MONTH MAP
-        # -------------------------------------------------
-
-        month_map = {
-
-            "JAN 2024": "January 2024",
-            "FEB 2024": "February 2024",
-            "MAR 2024": "March 2024",
-            "APR 2024": "April 2024",
-            "MAY 2024": "May 2024",
-            "JUN 2024": "June 2024",
-            "JUL 2024": "July 2024",
-            "AUG 2024": "August 2024",
-            "SEP 2024": "September 2024",
-            "OCT 2024": "October 2024",
-            "NOV 2024": "November 2024",
-            "DEC 2024": "December 2024",
-
-            "JAN 2025": "January 2025",
-            "FEB 2025": "February 2025",
-            "MAR 2025": "March 2025",
-            "APR 2025": "April 2025",
-            "MAY 2025": "May 2025",
-            "JUN 2025": "June 2025",
-            "JUL 2025": "July 2025",
-            "AUG 2025": "August 2025",
-            "SEP 2025": "September 2025",
-            "OCT 2025": "October 2025",
-            "NOV 2025": "November 2025",
-            "DEC 2025": "December 2025",
-
-            "JAN 2026": "January 2026",
-            "FEB 2026": "February 2026",
-            "MAR 2026": "March 2026"
-        }
-
-        # -------------------------------------------------
         # WRITE HISTORY
         # -------------------------------------------------
 
@@ -265,7 +209,10 @@ def fill_excel_multi(all_data):
                 column=lc
             ).value = index + 1
 
+            # ---------------------------------------------
             # SAFE ITEM
+            # ---------------------------------------------
+
             if index < len(history):
 
                 item = history[index]
@@ -277,7 +224,7 @@ def fill_excel_multi(all_data):
                     "units": 0
                 }
 
-            m_short = item.get(
+            month_name = item.get(
                 "month",
                 ""
             )
@@ -285,10 +232,7 @@ def fill_excel_multi(all_data):
             ws.cell(
                 row=row_idx,
                 column=lc + 1
-            ).value = month_map.get(
-                m_short.upper(),
-                m_short
-            )
+            ).value = month_name
 
             units_value = item.get(
                 "units",
@@ -310,31 +254,12 @@ def fill_excel_multi(all_data):
                 column=lc + 2
             ).value = units_value
 
-            if index == 0:
-
-                bill_amount = data.get(
-                    "bill_amount",
-                    ""
-                )
-
-                unit_cost = data.get(
-                    "unit_cost",
-                    ""
-                )
-
-                ws.cell(
-                    row=row_idx,
-                    column=lc + 3
-                ).value = bill_amount
-
-                ws.cell(
-                    row=row_idx,
-                    column=lc + 4
-                ).value = unit_cost
-
             total_units += units_value
 
-            # Borders
+            # ---------------------------------------------
+            # BORDERS
+            # ---------------------------------------------
+
             for col in range(lc, lc + 5):
 
                 ws.cell(
@@ -351,28 +276,80 @@ def fill_excel_multi(all_data):
             2
         )
 
+        # ---------------------------------------------
+        # kW CALCULATION
+        # ---------------------------------------------
+
         kw = round(
             avg_units / 106,
-            9
+            3
         )
 
-        solar_panels = round(
-            kw / 0.6,
-            9
+        # ---------------------------------------------
+        # PANEL DETAILS
+        # ---------------------------------------------
+
+        panel_watts = 600
+
+        panel_kw = panel_watts / 1000
+
+        # ---------------------------------------------
+        # REQUIRED PANELS
+        # ---------------------------------------------
+
+        number_panels = math.ceil(
+            kw / panel_kw
         )
+
+        # ---------------------------------------------
+        # SOLAR CAPACITY
+        # ---------------------------------------------
 
         solar_capacity = round(
-            solar_panels * 0.7,
+            number_panels * panel_kw,
             1
         )
 
-        number_panels = round(
-            solar_capacity / 0.6
+        # ---------------------------------------------
+        # SOLAR PANELS VALUE
+        # ---------------------------------------------
+
+        solar_panels = round(
+            kw / panel_kw,
+            3
         )
 
-        total_capacity += solar_capacity
+        # ---------------------------------------------
+        # TOTALS
+        # ---------------------------------------------
 
+        total_capacity += solar_capacity
         total_panels += number_panels
+
+        # -------------------------------------------------
+        # BILL AMOUNT + UNIT COST
+        # -------------------------------------------------
+
+        bill_amount = safe_float(
+            data.get("bill_amount", 0)
+        )
+
+        units_main = safe_float(
+            data.get("units", 0)
+        )
+
+        unit_cost = 0
+
+        if units_main > 0:
+
+            unit_cost = round(
+                bill_amount / units_main,
+                2
+            )
+
+        # -------------------------------------------------
+        # WRITE CALCULATIONS
+        # -------------------------------------------------
 
         calc_start = 24
 
@@ -437,6 +414,30 @@ def fill_excel_multi(all_data):
 
             calc_start += 1
 
+        # -------------------------------------------------
+        # BILL AMOUNT + UNIT COST BESIDE AVERAGE
+        # -------------------------------------------------
+
+        ws.cell(
+            row=24,
+            column=lc + 3
+        ).value = bill_amount
+
+        ws.cell(
+            row=24,
+            column=lc + 4
+        ).value = unit_cost
+
+        ws.cell(
+            row=24,
+            column=lc + 3
+        ).border = border
+
+        ws.cell(
+            row=24,
+            column=lc + 4
+        ).border = border
+
     # -------------------------------------------------
     # TOTALS
     # -------------------------------------------------
@@ -451,6 +452,9 @@ def fill_excel_multi(all_data):
     ws["D33"] = "Number of solar panels"
 
     ws["E33"] = total_panels
+
+    ws["D32"].font = bold
+    ws["D33"].font = bold
 
     # -------------------------------------------------
     # WIDTHS
