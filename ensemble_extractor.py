@@ -212,6 +212,13 @@ current_reading
 previous_reading
 units
 
+fixed_charges
+energy_charges
+electricity_duty
+wheeling_charges
+fuel_adjustment
+unit_cost
+
 JSON FORMAT:
 
 {
@@ -226,7 +233,14 @@ JSON FORMAT:
   "late_amount":"",
   "current_reading":"",
   "previous_reading":"",
-  "units":""
+  "units":"",
+
+  "fixed_charges":"",
+  "energy_charges":"",
+  "electricity_duty":"",
+  "wheeling_charges":"",
+  "fuel_adjustment":"",
+  "unit_cost":""
 }
 """
 
@@ -258,6 +272,8 @@ JSON FORMAT:
   ]
 }
 """
+
+
 # =====================================================
 # MISTRAL EXTRACTION
 # =====================================================
@@ -464,7 +480,14 @@ def merge_results(
         "late_amount",
         "current_reading",
         "previous_reading",
-        "units"
+        "units",
+
+        "fixed_charges",
+        "energy_charges",
+        "electricity_duty",
+        "wheeling_charges",
+        "fuel_adjustment",
+        "unit_cost"
     ]
 
     for field in fields:
@@ -503,6 +526,31 @@ def merge_results(
         consumer = consumer[:12]
 
     final["consumer_number"] = consumer
+
+    # =====================================================
+    # AUTO CALCULATE UNIT COST
+    # =====================================================
+
+    try:
+
+        bill_amount = float(
+            final.get("bill_amount", 0)
+        )
+
+        units = float(
+            final.get("units", 0)
+        )
+
+        if units > 0:
+
+            final["unit_cost"] = round(
+                bill_amount / units,
+                2
+            )
+
+    except:
+
+        final["unit_cost"] = 0
 
     # =====================================================
     # VALIDATION
