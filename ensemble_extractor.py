@@ -2,9 +2,19 @@ import os
 import json
 import base64
 import cv2
+import pytesseract
 
 from groq import Groq
 from mistralai import Mistral
+
+
+# =====================================================
+# TESSERACT PATH (WINDOWS)
+# =====================================================
+
+pytesseract.pytesseract.tesseract_cmd = (
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+)
 
 
 # =====================================================
@@ -30,6 +40,50 @@ def only_digits(text):
         filter(str.isdigit, str(text))
     )
 
+
+# =====================================================
+# TESSERACT DIGIT OCR
+# =====================================================
+
+def extract_digits_tesseract(image_path):
+
+    img = cv2.imread(image_path)
+
+    gray = cv2.cvtColor(
+        img,
+        cv2.COLOR_BGR2GRAY
+    )
+
+    gray = cv2.resize(
+        gray,
+        None,
+        fx=4,
+        fy=4
+    )
+
+    thresh = cv2.threshold(
+        gray,
+        0,
+        255,
+        cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )[1]
+
+    text = pytesseract.image_to_string(
+
+        thresh,
+
+        config=(
+            "--psm 7 "
+            "-c tessedit_char_whitelist=0123456789"
+        )
+    )
+
+    return only_digits(text)
+
+
+# =====================================================
+# VALIDATE UNITS
+# =====================================================
 
 def validate_units(data):
 
@@ -61,6 +115,10 @@ def validate_units(data):
 
         return False
 
+
+# =====================================================
+# CHOOSE BEST VALUE
+# =====================================================
 
 def choose_best(v1, v2):
 
@@ -529,53 +587,6 @@ def merge_results(
                 l_val
             )
 
-    # FIX CONSUMER NUMBER
-
-    consumer = only_digits(
-        final.get("consumer_number", "")
-    )
-
-    if len(consumer) > 12:
-
-        consumer = consumer[-12:]
-
-    final["consumer_number"] = consumer
-
-    # FIX METER NUMBER
-
-    meter = only_digits(
-        final.get("meter_number", "")
-    )
-
-    final["meter_number"] = meter
-
-    # UNIT COST
-
-    try:
-
-        bill_amount = float(
-            final.get("bill_amount", 0)
-        )
-
-        units = float(
-            final.get("units", 0)
-        )
-
-        if units > 0:
-
-            final["unit_cost"] = round(
-                bill_amount / units,
-                2
-            )
-
-    except:
-
-        final["unit_cost"] = 0
-
-    final["valid_units"] = validate_units(
-        final
-    )
-
     return final
 
 
@@ -643,11 +654,35 @@ def extract_with_ensemble(
             consumer_data["consumer_number"]
         )
 
-        if len(consumer) > 12:
+        # USE MISTRAL IF VALID
+        if len(consumer) >= 10:
 
-            consumer = consumer[-12:]
+            if len(consumer) > 12:
 
-        final["consumer_number"] = consumer
+                consumer = consumer[-12:]
+
+            final["consumer_number"] = consumer
+
+        # FALLBACK TO TESSERACT
+        else:
+
+            tesseract_consumer = (
+                extract_digits_tesseract(
+                    consumer_crop
+                )
+            )
+
+            if len(tesseract_consumer) >= 10:
+
+                if len(tesseract_consumer) > 12:
+
+                    tesseract_consumer = (
+                        tesseract_consumer[-12:]
+                    )
+
+                final["consumer_number"] = (
+                    tesseract_consumer
+                )
 
     # =====================================================
     # METER NUMBER RECHECK
@@ -665,9 +700,62 @@ def extract_with_ensemble(
 
     if meter_data.get("meter_number"):
 
-        final["meter_number"] = only_digits(
+        meter = only_digits(
             meter_data["meter_number"]
         )
+
+        # USE MISTRAL IF VALID
+        if len(meter) >= 10:
+
+            final["meter_number"] = meter
+
+        # FALLBACK TO TESSERACT
+        else:
+
+            tesseract_meter = (
+                extract_digits_tesseract(
+                    meter_crop
+                )
+            )
+
+            if len(tesseract_meter) >= 10:
+
+                final["meter_number"] = (
+                    tesseract_meter
+                )
+
+    # =====================================================
+    # UNIT COST
+    # =====================================================
+
+    try:
+
+        bill_amount = float(
+            final.get("bill_amount", 0)
+        )
+
+        units = float(
+            final.get("units", 0)
+        )
+
+        if units > 0:
+
+            final["unit_cost"] = round(
+                bill_amount / units,
+                2
+            )
+
+    except:
+
+        final["unit_cost"] = 0
+
+    # =====================================================
+    # VALIDATE UNITS
+    # =====================================================
+
+    final["valid_units"] = validate_units(
+        final
+    )
 
     # =====================================================
     # GRAPH EXTRACTION
