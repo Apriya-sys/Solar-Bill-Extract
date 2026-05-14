@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 
+
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 from extract_bill import extract_bill_data
@@ -54,6 +55,13 @@ with st.sidebar:
         type="password"
     )
 
+    mistral_key = st.text_input(
+        "Mistral API Key",
+        type="password"
+    )
+    if not groq_key:
+        groq_key = st.secrets.get("GROQ_API_KEY", "")
+
 # -------------------------------------------------
 # FIELDS
 # -------------------------------------------------
@@ -80,10 +88,10 @@ FIELDS = [
 
 if uploaded_files:
 
-    if not groq_key:
+    if not groq_key or not mistral_key:
 
         st.error(
-            "Please enter Groq API Key"
+            "Please enter both Groq and Mistral API Keys"
         )
 
         st.stop()
@@ -134,9 +142,10 @@ if uploaded_files:
             ):
 
                 data = extract_bill_data(
-                    file_path,
-                    groq_api_key=groq_key
-                )
+                file_path,
+                mistral_api_key=mistral_key,
+                groq_api_key=groq_key
+           )
 
                 all_data.append(data)
 
