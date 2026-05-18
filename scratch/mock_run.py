@@ -3,7 +3,14 @@ import os
 sys.path.append(os.getcwd())
 import extract_bill
 from fill_excel import fill_excel_multi
+import os
 import json
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
+mistral_api_key = os.getenv("MISTRAL_API_KEY")
+groq_api_key = os.getenv("GROQ_API_KEY")
 
 # Mock get_ocr_lines to use saved text files
 def mock_get_ocr_lines(image_path):
@@ -39,8 +46,15 @@ bill_images = ["assets/bill1.jpeg", "assets/bill2.jpeg"]
 all_data = []
 
 for image_path in bill_images:
+
     print(f"Processing mock data for: {image_path}")
-    data = extract_bill.extract_bill_data(image_path)
+
+    data = extract_bill.extract_bill_data(
+        image_path,
+        mistral_api_key=mistral_api_key,
+        groq_api_key=groq_api_key
+    )
+
     all_data.append(data)
 
 if all_data:

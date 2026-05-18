@@ -2,10 +2,15 @@ import streamlit as st
 import os
 
 
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+from dotenv import load_dotenv
+load_dotenv()
+groq_key = os.getenv("GROQ_API_KEY")
+mistral_key = os.getenv("MISTRAL_API_KEY")
 from extract_bill import extract_bill_data
 from fill_excel import fill_excel_multi
+import os
 
 
 # -------------------------------------------------
@@ -44,25 +49,7 @@ uploaded_files = st.file_uploader(
 # SIDEBAR
 # -------------------------------------------------
 
-with st.sidebar:
 
-    st.markdown("---")
-
-    st.subheader("⚙️ AI Settings")
-
-    groq_key = st.text_input(
-        "Groq API Key",
-        type="password"
-    )
-
-    mistral_key = st.text_input(
-        "Mistral API Key",
-        type="password"
-    )
-    if not groq_key:
-        groq_key = st.secrets.get("GROQ_API_KEY", "")
-
-# -------------------------------------------------
 # FIELDS
 # -------------------------------------------------
 
@@ -88,13 +75,7 @@ FIELDS = [
 
 if uploaded_files:
 
-    if not groq_key or not mistral_key:
 
-        st.error(
-            "Please enter both Groq and Mistral API Keys"
-        )
-
-        st.stop()
 
     process_btn = st.button(
         "🚀 Extract Data",
